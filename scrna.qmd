@@ -1,0 +1,520 @@
+---
+title: "Analysis of single=cell RNA-seq data: Signatures of Alzheimer's"
+author: "Saket Choudhary <saketc@iitb.ac.in>"
+output:
+  html_document:
+    theme: cosmo
+    df_print: kable
+date: today
+---
+
+# How should I run this notebook?
+
+The easiest way to run each of the steps in this notebook is to download the raw file [here](https://drive.google.com/file/d/17oZp9zalC5ZobQHwlzQB44jznty3KFf6/view?usp=sharing), open it in Rstudio and run each code block one by one.
+
+# Biological background
+
+Alzheimer's disease (AD) is the most common form of dementia. Demential is a broad umbrella term for all major major neurocognitive disorders that impairs a person's ability to remember, think, or make decisions. Pathologically, the disease is believed to occur when amyloid beta (A$\beta$) peptides accumulates abnormally in the extracellular space. This is followed by intraneuronal tau hyperphosphorylation and aggregation which causes neuronal and synaptic dysfunction and cell death.
+
+The brain is made of different celltypes which can broadly be classified into three categories: excitatory, inhibitory and non-neuronal cells. Non-neuronal cells comprise of glial cells, ependymal cells, endothelial cells and pericytes. Glial cells can be further subdivided into macroglia (astrocytes and oligdendrocytes) and microglia - the primary immune cells of the central nervous system.
+
+A number of studies have shown that among all the celltypes, microglia undergo the most prominent changes in AD brains. This is evident in two forms: 1) a change in cellular composition with AD brains exhibiting higher number of microglia and 2) a robust transcitiptional activation signal in the microglia cells. The activated microglia is referred to as DAM (Disease associated microglia) and has a distinct transcriptional signature than the homoeostatic microglia (control). This signal is conserved in mouse models (5xFAD) of AD. Multiple studies have also characterized the impact of genetic variants in the TREM2 gene. Loss of TREM2 in mice AD model (5XFAD) restricts the ability of microglia to surround A$\beta$ plaques.
+
+In this vignette, following [Zhou et al., 2020](https://pubmed.ncbi.nlm.nih.gov/31932797/) we will investigate the changes associated with AD pathology and TREM2 deficit brains from 5XFAD mice undergoing A$\beta$ accumulation.
+
+# Download the object
+
+For this vignette, we will focus on a single-cell dataset coprising 27,999 cells profiled from 15 month old mice. You can download the raw object [here](https://drive.google.com/file/d/1U2XwZPj0P316cdxex9M1fz4OVZbsbIKS/view?usp=sharing). For details about how the object was created see [this notebook](/scrna-prep.html)
+
+<details>
+
+<summary>QC steps</summary>
+
+## Downloading raw files from GEO
+
+The raw counts matrices were deposited by authors on [GEO](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE140511). To download all the files, you can either download the [.zip](https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE140511&format=file) or use `wget`:
+
+```{r, eval=FALSE}
+# run in terminal
+wget -c --content-disposition "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GS
+E140511&format=file"
+```
+
+## Quality control to discard low-quality cells
+
+Once the files have been downloaded, we use `ReadMtx` to read the raw files and create one object per sample using the `CreateSeuratObject` function. Ultimately, we merge these objects into one object with appropriate steps for adding metadata and use the criteria defined by original authors for retaining high quality cells:
+
+```{r, eval=FALSE}
+sample_names.7 <- c(
+  "GSM4173504_WT_1", "GSM4173505_WT_2", "GSM4173506_WT_3",
+  "GSM4173507_Trem2_KO_1", "GSM4173508_Trem2_KO_2", "GSM4173509_Trem2_KO_3",
+  "GSM4173510_WT_5XFAD_1", "GSM4173511_WT_5XFAD_2", "GSM4173512_WT_5XFAD_3",
+  "GSM4173513_Trem2_KO_5XFAD_1", "GSM4173514_Trem2_KO_5XFAD_2", "GSM4173515_Trem2_KO_5XFAD_3"
+)
+
+objects.list <- list()
+for (sample in sample_names.7) {
+  counts <- ReadMtx(
+    mtx = file.path("data/Mouse_TREM2_data/", paste0(sample, "_matrix.mtx.gz")),
+    cells = file.path("data/Mouse_TREM2_data/", paste0(sample, "_barcodes.tsv.gz")),
+    features = file.path("data/Mouse_TREM2_data/", paste0(sample, "_features.tsv.gz"))
+  )
+  object <- CreateSeuratObject(counts = counts, project = sample, min.cells = 5, min.features = 5)
+  object[["percent.mt"]] <- PercentageFeatureSet(object = object, pattern = "^mt-")
+  object <- subset(object, nCount_RNA >= 300 & nCount_RNA < 9001 & nFeature_RNA >= 300 & nFeature_RNA < 5601 & percent.mt < 5)
+  # Add a new column to the object to store the percentage of UMIs originating from mitochondrial genes (these beging with mt- such as my-Cytb)
+  object[["percent.mt"]] <- PercentageFeatureSet(object = object, pattern = "^mt-")
+  # Rename the cells by prefixing a sample id to make sure the cell names are unique when merging
+  object <- RenameCells(object = object, add.cell.id = sample)
+  object$sample_name <- sample
+  objects.list[[sample]] <- object
+}
+object <- merge(objects.list[[1]], objects.list[2:length(objects.list)])
+# 82973 samples
+object$sample_name2 <- gsub(pattern = "Trem2_KO", replacement = "Trem2KO", x = object$sample_name)
+
+object$genotype <- stringr::str_split_fixed(string = object$sample_name2, pattern = "_", n = Inf)[, 2]
+object$mouse_model <- "WT"
+object$mouse_model[grepl(pattern = "5XFAD", x = object$sample_name2)] <- "5XFAD"
+```
+
+# Loading data
+
+Before we begin, please make sure you have all the necessary packages installed. In addition to `Seurat`, `tidyverse`, `ggrepel`, and `glmGamPoi`, we will also install `reshape2` and `enrichR` pacakges
+
+```{r, eval=FALSE}
+setRepositories(ind = 1:3) # set repositories to install Bioconductor dependencies
+install.packages(c("Seurat", "tidyverse", "ggrepel", "glmGamPoi", "reshape2", "org.Mm.eg.db", "org.Hs.eg.db", "clusterProfiler"))
+```
+
+We can read the object by providing it an appropriate path (make sure you have downloaded the object first):
+
+```{r}
+suppressPackageStartupMessages({
+  library(Seurat)
+  library(tidyverse)
+})
+object <- readRDS(here::here("data/scrna/Stage15_all.rds"))
+object <- JoinLayers(object)
+theme_set(theme_classic(base_size = 14)) # set ggplot2 theme
+```
+
+# Exploring the object
+
+Before we do any downstream processing, it is always a good idea to explore the object at hand.
+
+The counts (UMIs) are stored in the "counts" slot of the "RNA" assay". You can read about the details of how Seurat stores its information on this [wiki page](https://github.com/satijalab/seurat/wiki/Assay).
+
+```{r}
+counts <- object@assays$RNA@layers$counts
+
+counts <- object@assays$RNA$counts
+
+# how the first 5 gene' and first 5 cell counts
+counts[1:5, 1:5]
+```
+
+In total we have 27999 cells (columns) and 17953 genes (rows):
+
+```{r}
+dim(counts)
+```
+
+Among these entries, we can calculate how many proportion of entries are non-zero:
+
+```{r}
+100 * round(sum(counts > 0) / (dim(counts)[1] * dim(counts)[2]), 2)
+```
+
+So 96% of entries in the `counts` matrix are zeroes (or only 4% of the values in the entire matrix are non-zeros).
+
+```{r}
+# take a look at the object metadata
+head(object)
+```
+
+You can add a custom column to the metadata using:
+
+```{r}
+# add a new metadata column
+object$my_column <- "test"
+head(object)
+```
+
+Or delete the column from the metadata:
+
+```{r}
+object$my_column <- NULL
+head(object)
+```
+
+You can plot some QC metrics using the `VlnPlot` command:
+
+```{r, fig.width=15, fig.height=6}
+VlnPlot(object, features = c("nCount_RNA", "nFeature_RNA", "percent.mt"))
+```
+
+You can see the help associated with this (or any function) function by typing '?VlnPlot' in the RStudio console.
+
+# Feature Selection
+
+Many genes in this dataset are "not informative" - they are either lowly expressed overall, or expressed in all the celltypes. For downstream analysis, we want to identify "informative" genes - this increases the signal to noise ratio for downstream dimensionaloty reduction.
+
+One way to select these genes would be to calculate a per-gene variance and select the ones with the highest variance. Let's explore the mean-variance relationship of these genes:
+
+```{r,}
+# get UMI counts from object
+counts <- GetAssayData(object = object, assay = "RNA", slot = "counts")
+
+# calculate per gene mean
+gene_mean <- rowMeans(x = counts)
+gene_variance <- apply(X = counts, MARGIN = 1, FUN = var)
+
+ggplot(data = data.frame("gene_mean" = gene_mean, "gene_variance" = gene_variance), aes(gene_mean, gene_variance)) +
+  geom_point() +
+  geom_abline(color="red")+
+  scale_x_log10() +
+  scale_y_log10() +
+  xlab("Gene mean") +
+  ylab("Gene variance") +
+  theme_bw(base_size = 14) 
+```
+
+So genes with higher means will also have higher variance because there is a strong mean-variance relationship exhibited by all genes. One way to adjust for this relationship is to explicitly model the mean-variance relationship by fitting a smooth curve and then identify genes that show high deviation from this "expected" pattern. This is essentially what is done inside the `FindVariableFeatures` function:
+
+```{r}
+object <- FindVariableFeatures(object = object, selection.method = "vst")
+VariableFeaturePlot(object)
+```
+
+In the plot above, the "variable genes" are highlhted in red and as clear from their mean values are not necessarily the most highly expressed (notice the genes with average expression \> 10)
+
+## Normalization
+
+The total number of UMIs observed for a cell are attributable to 1) cell size (higher cell size =\> more RNA content =\> more expected UMIs) and 2) sequencing depth. Let's look at the expression of a ubiquoulsy expressed gene (Malat1- a long noncoding RNA):
+
+```{r}
+total_umis <- colSums(x = counts)
+gene <- "Malat1"
+gene_umi <- as.numeric(counts[gene, ])
+
+ggplot(data = data.frame("total_cell_umi" = total_umis, "gene_umi" = gene_umi), aes(total_cell_umi, gene_umi)) +
+  geom_point() +
+  theme_bw(base_size = 14) + xlab("Total sequencing depth") + ylab(paste0("Gene UMI(", gene))
+```
+
+This gene (Malat1) shows an almost linear relationship with sequencing depth of a cell. In this case the "heterogeneity across cells " in expression levels of Malat1 are primarly attributable to the fact that these cells were sequenced to different deths and is un interesting.
+
+If all the genes showed this linear behavior we could have simply "regressed" out the effect of sequencing depth by performing a linear regression of observed gene count agaisnt the total sequencing depth of the cell. But it is not a good idea because there are also marker genes such as Apoe (an astrocytes marker), Vip (a marker for Vip interneurons - these are a type of inhibitory neurons) and C1qa (a marker of microglia)
+
+```{r}
+data.to.plot <- FetchData(object = object, slot = "counts", vars = c("Apoe", "Vip", "C1qa", "nCount_RNA"))
+head(data.to.plot)
+```
+
+```{r}
+data.to.plot.genewise <- reshape2::melt(data.to.plot, id.vars = "nCount_RNA")
+ggplot(data.to.plot.genewise, aes(nCount_RNA, value)) +
+  geom_point() +
+  facet_wrap(~variable) +
+  xlab("Sequencing depth") +
+  ylab("Gene UMI") +
+  theme_bw(base_size = 14)
+```
+
+Given these are marker genes, they are only expressed in a subset of cells. A simple linear regression where we regress out the sequencing depth from each gene's UMI will end up affecting these marker genes negatively - dampening their expression.
+
+### Log Normalization
+
+Instead of regressing out sequencing depth, an alternate idea is to to use a global scale factor (say 10,000) and "scale" all cells to have this sequencing depth while also accounting for the sequencing depth of the cell. To reduce the impact of outliers, these scaled values are log transformed (after adding a pseudocount of 1). To perform this normalizing using Seurat, you can use the `NormalizeData` function:
+
+```{r}
+object <- NormalizeData(object = object, scale.factor = median(object$nCount_RNA))
+object <- ScaleData(object = object)
+```
+
+### What is "good normalization"?
+
+There are two key properties that any "good normalization" method should achieve:
+
+1.  The normalized expression values of a gene should have minimal dependence on the seuquencing depth
+
+2.  The variance of normalized gene expression values across should cells should primarily reflect biological variation and not technical noise and should be independent of gene's mean expression level or sequencing depth of the cell.
+
+Let's look into the expression pattern of the same highly expressed gene after running Log Normalization:
+
+```{r}
+gene <- "Malat1"
+# normalized values are stored in the "data" slot
+object <- NormalizeData(object = object, scale.factor = 10000)
+lognormalized.data <- GetAssayData(object = object, assay = "RNA", slot = "data")[gene, ]
+ggplot(data.frame("sequencing_depth" = colSums(x = counts), "normalized_values" = lognormalized.data), aes(sequencing_depth, normalized_values)) +
+  geom_point() +
+  theme_bw(base_size = 14)
+```
+
+Compare this relationship with an earlier figure where we were plotting the raw expression values - the correlation between y and x axis has reduced significantly. But as we will see in the next figure, this correlation is not zero.
+
+```{r}
+counts <- GetAssayData(object = object, assay = "RNA", slot = "counts")
+lognormalized.data <- GetAssayData(object = object, assay = "RNA", slot = "data")
+
+# compute per gene correlation with sequencing depth of each cell
+var.features <- VariableFeatures(object = object)
+
+corr.counts <- apply(X = counts[var.features, ], MARGIN = 1, FUN = function(x) cor(x = x, y = colSums(x = counts)))
+corr.lognorm <- apply(X = lognormalized.data[var.features, ], MARGIN = 1, FUN = function(x) cor(x = x, y = colSums(x = counts)))
+
+df <- data.frame(corr = c(corr.counts, corr.lognorm), type = c(
+  rep("Raw counts", length(corr.counts)),
+  rep("Log normalized", length(corr.lognorm))
+))
+
+ggplot(data = df, aes(corr, fill = type)) +
+  geom_histogram() +
+  theme_bw(base_size = 14)
+```
+
+## One step normalization and feature selection: SCTransform
+
+A second way to achieve variance stabilization (and variable feature selection) is by using SCTransform. In SCTransform, we use a regularized negative binomial model to directly model the single-cell counts. The normalized counts are then cacluclated by reversing this general reltaionship by substituting the observed count depth as the median sequencing depth. You can read the SCTransform publication for more details ([SCTransform](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-021-02584-9) [SCTransform-v2](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1874-1)).
+
+We will use SCTransform based analysis for the rest of the work flow.
+
+```{r}
+object <- SCTransform(object = object, 
+                      vst.flavor = "v2", verbose = FALSE)
+```
+
+Compare the correlation of SCT normalized data with sequencing depth:
+
+```{r}
+sct.data <- GetAssayData(object = object, assay = "SCT", slot = "data")
+corr.sct <- apply(X = sct.data[intersect(var.features, rownames(sct.data)), ], MARGIN = 1, FUN = function(x) cor(x = x, y = colSums(x = counts)))
+
+df <- data.frame(corr = c(corr.counts, corr.lognorm, corr.sct), type = c(
+  rep("counts", length(corr.counts)),
+  rep("Log normalized", length(corr.lognorm)), rep("SCT normalized", length(corr.sct))
+))
+
+ggplot(data = df, aes(corr, fill = type)) +
+  geom_histogram() +
+  theme_bw(base_size = 14) 
+```
+
+## Linear Dimensionality reduction
+
+While we measured around 17000 genes, the "intrinsic" dimensionality of data is smaller - we do not expect all 17000 genes to be orthogonal ("independent" measurements). There will be "modules" of genes that are co-expressed. We want to reduce the dimensioanloty of this dataset to a) enhance the signal to noise ratio and b) visualize this information. A common strategy in this case is to use Principle Component Analysis (PCA) which is a linear dimensionalty reduction method that outputs a smaller (20-50 usually, but upto n-1 PCs in a n dimensional dataset) orthologonal dimensions.
+
+```{r}
+object <- RunPCA(object = object, npcs = 50, verbose = FALSE)
+```
+
+Rather than including all the PCs, we want to retain the most informative PCs. The goal here is to avoid adding extra PCs that might reflect other sources of variation (technical) assuming the major source of variation in the dataset is biological.
+
+One way to visualize the "intrinsic dimensionality" of this dataset is to to see how the variance explained by individual PCs varies in the form of an elbow plot:
+
+```{r}
+ElbowPlot(object, ndims = 30)
+```
+
+The standard deviation (sequare root of variance) seems to plateau around PC30, so we will retain 30 PCs for downstream visualization and clustering.
+
+```{r}
+DimPlot(object)
+
+```
+## Non linear dimensionality reduction
+
+While he previous PCA analysis resulted in 30 dimensions, we want to further reduce the dimension of our dataset to 2 to be able to visualize it. While there are different methods to do this, we will utilize Uniform Manifold Approximation and Projection (UMAP). The goal of UMAP and related dimensionality reduction methods is to find a set of 2-D coordinates for the multidimensional input dataset such that the difference in cell-cell similarities between the low-dimensional and original-dimension dataset is minimized.
+
+```{r}
+object <- RunUMAP(object, reduction = "pca", dims = 1:30)
+```
+
+```{r, fig.width=8, fig.height=7}
+DimPlot(object)
+```
+
+The above plot shows how individual cells are located in a 2D space (defined by the UMAP coordinates). Our dataset is finally ready for a deeper dive in the biology.
+
+## Clustering
+
+We can now find "clusters" of cells that likely represent the same celltype. For single-cell data, a popular choice of methods for clustering is graph-based community detection methods that can scale to millions of cells (as opposed to tree-based methods such as hierechial clustering):
+
+```{r}
+# build SNN graph
+object <- FindNeighbors(object, reduction = "pca", dims = 1:30)
+object <- FindClusters(object, resolution = 0.3)
+```
+
+```{r, fig.width=8, fig.height=7}
+DimPlot(object, label = TRUE)
+```
+
+# Identifying Microglia cluster
+
+We can visualize some of the marker genes that define the Microglia (See Figure 2 in the associated paper)
+
+```{r, fig.width=7, fig.height=5}
+FeaturePlot(object, features = c("C1qa", "Fcrls", "Tyrobp", "Csf1r", "Cx3cr1", "P2ry12"))
+```
+
+While we can clearly see which cells have highe expression of these genes on the UMAP, it is not clear which "cluster" these cells belong to. You can use `VlnPlot` to plot the expression pattern of these genes:
+
+```{r, fig.width=9, fig.height=5.4}
+VlnPlot(object, features = c("C1qa", "Fcrls", "Tyrobp", "Csf1r", "Cx3cr1", "P2ry12"))
+```
+
+So Cluster 12 is our microglia cluster, we can separate it out to do a deeper analysis
+
+```{r}
+# subset out cluster 12
+all.microglia <- subset(object, idents = "12")
+```
+
+# Find differentiating markers between the 5XFAD (AD) mouse and the WT mouse
+
+Our next goal is to decipher what genes are differentially expressed in the 5XFAD mouse as compared to the WT mouse (we expect there to be some genes that will be highly expressed in WT and lowly expressed in 5X5AD and vice-versa).
+
+To find differentially expressed (DE) genes, we first set the "identity" of the cells to be the "mouse_model" metadata column and then identify diferentially expressed genes in the 5XFAD mouse as compared to the "WT" mouse using the `FindMarkers` command:
+
+```{r}
+# Assign the identity to be the mouse model
+# among the 'mouse_model` labeled 5XFAD we have both the original 5XFAD (labeled as 'WT' under `genotype` column) and a 'TREM2KO' reflecting the TREM2KO which we remove for this part of the analysis
+
+microglia.notrem2ko <- subset(all.microglia, genotype %in% c("WT"))
+
+
+Idents(microglia.notrem2ko) <- "mouse_model"
+
+markers.wt_vs_5ad <- FindMarkers(microglia.notrem2ko, ident.1 = "5XFAD", ident.2 = "WT")
+markers.wt_vs_5ad$gene <- rownames(markers.wt_vs_5ad)
+head(markers.wt_vs_5ad)
+```
+
+To visualize these genes we will make use of a "volcano plot" where on the x-axis we will plot the log fold change of each gene and the associated p-value will be plotted on the y-axis. Additinally we will also highlight top 10 DE genes in both directions (positive, i.e. upregulated in 5XFAD and negative, i.e. downregulated in 5XFAD).
+
+```{r}
+library(ggrepel) # load this library to plot gene names
+
+markers.wt_vs_5ad.top10.pos <- markers.wt_vs_5ad %>%
+  filter(avg_log2FC>0) %>% filter(p_val_adj<0.05) %>% top_n(n = 10, wt = avg_log2FC)
+markers.wt_vs_5ad.top10.neg <- markers.wt_vs_5ad  %>%
+   filter(avg_log2FC<0) %>%
+  filter(p_val_adj<0.05) %>% top_n(n = 10, wt = abs(avg_log2FC))
+markers.wt_vs_5ad.top10 <- rbind(markers.wt_vs_5ad.top10.pos, markers.wt_vs_5ad.top10.neg)
+
+ggplot(markers.wt_vs_5ad, aes(avg_log2FC , -log10(p_val))) +
+  geom_point() +
+  geom_point(data = markers.wt_vs_5ad.top10, aes(avg_log2FC , -log10(p_val)), color="red" ) +
+  geom_text_repel(data = markers.wt_vs_5ad.top10, aes(avg_log2FC, -log10(p_val), label = gene)) + xlab("average log2 Fold Change") + ylab("-log10(Pvalue)")
+
+```
+
+# Functional enrichment
+
+On obvious question to ask with the list of DE genes is what function are these carrying? We can perform a gene ontology enrichment using the gene lists to see what functional categories is each of the DE list enriched in.
+
+```{r}
+library(clusterProfiler)
+library(org.Mm.eg.db) # install using BiocManager::install("org.Mm.eg.db")
+
+
+universe.genes <- rownames(counts)
+DoEnrichment <- function(genes, universe.genes) {
+  enrich <- enrichGO(gene = genes,
+                     universe = universe.genes,
+                     OrgDb = org.Mm.eg.db,
+                     keyType = "SYMBOL",
+                     ont = "BP",
+                     pvalueCutoff = 0.05,
+                     qvalueCutoff = 0.05,
+                     readable = TRUE)
+  return(enrich)
+}
+de.pos <- markers.wt_vs_5ad %>%
+  filter(avg_log2FC>0) %>% filter(p_val_adj<0.1) %>% pull (gene)
+
+de.neg <- markers.wt_vs_5ad %>%
+  filter(avg_log2FC<0) %>% filter(p_val_adj<0.1) %>% pull (gene)
+
+
+enrichment.pos <- DoEnrichment(genes = de.pos, universe.genes = universe.genes)
+enrichment.neg <- DoEnrichment(genes = de.neg, universe.genes = universe.genes)
+```
+
+```{r}
+                                
+barplot(enrichment.pos)+ ggtitle("Enrichment of 5XFAD upregulated genes")
+```
+
+```{r}
+
+barplot(enrichment.neg, showTerms = 7) + ggtitle("Enrichment of 5XFAD downregulated genes")
+
+```
+
+We should compare your results with the following claim in the paper:
+
+> DAM genes, including Cst7, Csf1, Apoe, Trem2, Lpl, Lilrb4a, H2-d1 (an MHC-I gene), Cd74 (an MHC-II-related gene) and various cathepsin genes were notably upregulated in 5XFAD compared with WT mice. Homeostatic genes, such as P2ry12, Selplg, Tmem119 and Cx3cr1, were downregulated. These results were highly concordant between the 7-month- and 15-month-old datasets (Fig. 2d) and with previously published single-cell RNAseq data of sorted microglia.
+
+List of genes upregulated in 5XFAD:
+
+```{r}
+de.pos
+```
+
+List of genes downregulated in 5XFAD:
+
+```{r}
+de.neg
+```
+
+# Exercise
+
+Identify what genes are differentially expressed in 5XFAD mouse as compared to the WT mouse.
+
+<details>
+
+<summary>Reveal solution</summary>
+
+The `mouse_model` column stores the information about it being a WT or an AD (5XFAD) mouse. In this study the authors were also interested in asking what changes happen to the microglial gene program if TREM2 is knocked out (given the prior knowledge about microglial transcriptional response dependence on TREM2). In the above analysis we removed cells that were not labeled as "WT" under their "genotype" column. Here we will subset a different set of cells which are all "5XFAD" but can have different `genotype` ("WT" or "TREM2KO")
+
+```{r}
+microglia.5xfad <- subset(all.microglia, mouse_model %in% c("5XFAD"))
+
+# now we set the identities to the genotype
+Idents(microglia.5xfad) <- "genotype"
+markers.5ad_vs_trem2ko <- FindMarkers(microglia.5xfad, ident.1 = "WT", ident.2 = "Trem2KO")
+markers.5ad_vs_trem2ko$gene <- rownames(markers.5ad_vs_trem2ko)
+head(markers.5ad_vs_trem2ko)
+
+```
+
+```{r}
+
+markers.5ad_vs_trem2ko.top10.pos <- markers.5ad_vs_trem2ko %>%
+  filter(avg_log2FC>0) %>% filter(p_val_adj<0.05) %>% top_n(n = 10, wt = avg_log2FC)
+markers.5ad_vs_trem2ko.top10.neg <- markers.5ad_vs_trem2ko  %>%
+   filter(avg_log2FC<0) %>%
+  filter(p_val_adj<0.05) %>% top_n(n = 10, wt = abs(avg_log2FC))
+markers.5ad_vs_trem2ko.top10 <- rbind(markers.5ad_vs_trem2ko.top10.pos, markers.5ad_vs_trem2ko.top10.neg)
+
+ggplot(markers.5ad_vs_trem2ko, aes(avg_log2FC , -log10(p_val))) +
+  geom_point() +
+  geom_point(data = markers.5ad_vs_trem2ko.top10, aes(avg_log2FC , -log10(p_val)), color="red" ) +
+  geom_text_repel(data = markers.5ad_vs_trem2ko.top10, aes(avg_log2FC, -log10(p_val), label = gene)) + xlab("average log2 Fold Change") + ylab("-log10(Pvalue)")
+```
+
+</details>
+
+<details>
+
+<summary>**Session Info**</summary>
+
+```{r}
+sessionInfo()
+```
+
+</details>
