@@ -1,0 +1,483 @@
+---
+title: "Analysis of bulk RNA-seq data: Signatures of Fibrosis"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    df-print: kable
+date: today
+---
+
+# Before we start: check your setup
+
+
+```{r}
+#| message: false
+pkgs <- c("tidyverse", "ggpubr", "here", "data.table", "DESeq2", "matrixStats",
+          "limma", "clusterProfiler", "org.Hs.eg.db", "ggrepel")
+missing_pkgs <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]
+if (length(missing_pkgs))
+  stop("Install these first: ", paste(missing_pkgs, collapse = ", "))
+
+library(here)
+need_files <- c("bulk/cdna/t2g.csv", "bulk/GSE135251_samples.csv", "bulk/GSE135251")
+missing_files <- need_files[!file.exists(here(need_files))]
+if (length(missing_files))
+  stop("Missing data (check you opened the project's .Rproj): ",
+       paste(missing_files, collapse = ", "))
+
+message("Setup OK. here() root = ", here())
+```
+
+# Generating kallisto index
+
+```{r, eval=FALSE}
+# run in terminal
+# mamba install kallisto
+# ./kallisto/kallisto index -t 8 -i human_cdna.idx cdna/Homo_sapiens.GRCh38.cdna.all.fa.gz
+kallisto index -t 8 -i human_cdna.idx cdna/Homo_sapiens.GRCh38.cdna.all.fa.gz
+```
+
+```{r, eval=FALSE}
+# run in terminal
+
+kallisto quant -i human_cdna.idx -o rnaseq_data/kallisto_output/ -t 12 rnaseq_data/fastq/SRR9883171_1.fastq.gz rnaseq_data/fastq/SRR9883171_2.fastq.gz
+```
+
+```{r, eval=FALSE}
+# run in terminal
+cd output
+ls -ltrha
+```
+
+```{r, eval=FALSE}
+# run in terminal
+head abundance.tsv
+```
+
+```{r, eval=FALSE}
+# run in terminal
+ zcat scripts/Homo_sapiens.GRCh38.cdna.all.fa.gz| head
+```
+
+```{r, eval=FALSE}
+# run in terminal
+cd cdna
+zcat Homo_sapiens.GRCh38.cdna.all.fa.gz| \
+grep '>' |
+awk '{FS= " "}BEGIN{ print "tx_id,gene_id,gene_name"};{print substr($1,2) "," substr($4,6) "," substr($7,13)};' > t2g.csv
+```
+
+You can also download the `t2g.csv` from here: https://www.dropbox.com/scl/fi/dpbslasta98e05tru1ao6/t2g.csv?rlkey=xp10abwca1om9zn5n8frnogn5&st=qxkb672p&dl=0
+
+```{r, eval=FALSE}
+wget --content-disposition -c "https://www.dropbox.com/scl/fi/dpbslasta98e05tru1ao6/t2g.csv?rlkey=xp10abwca1om9zn5n8frnogn5&st=qxkb672p&dl=0"
+```
+
+Download the metadata from  https://seqout.org/p/GSE135251
+
+Also available [here](https://www.dropbox.com/scl/fi/uk6o1s2cegl77gcma7r81/GSE135251_samples.csv?rlkey=2nzbodzezbpx5qm79t35stwr8&st=m801enqd&dl=0)
+
+
+
+# Analysis of kallisto counts
+
+```{r}
+library(tidyverse)
+library(ggpubr)
+library(here)
+
+theme_set(theme_pubr())
+# change file paths as required
+
+geo.counts <- read_tsv(here("bulk/GSE135251/GSM3998232_17_82.counts.txt.gz"), col_names = c("gene_id", "geo_counts")) 
+head(geo.counts)
+```
+
+```{r}
+# change file paths as required
+
+t2g <- read_csv(here("bulk/cdna/t2g.csv"))
+head(t2g)
+```
+
+```{r}
+# change file paths as required
+kallisto.tx.counts <- read_tsv(here("bulk/rnaseq_data/kallisto_output/abundance.tsv"))
+head(kallisto.tx.counts)
+```
+
+```{r}
+# change file paths as required
+kallisto.gene.counts <- kallisto.tx.counts %>%
+    inner_join(t2g, by = c("target_id" = "tx_id")) %>% 
+    mutate(gene_id = str_replace(gene_id, "\\..*", "")) %>% # remove .1, .2 etc
+    group_by(gene_id, gene_name) %>% # group by gene id
+    summarise(kallisto_counts = sum(est_counts)) %>% # sum the counts across all isoforms of a gene
+    ungroup() 
+
+kallisto.geo.counts <- full_join(kallisto.gene.counts, geo.counts)
+```
+
+```{r}
+library(ggpubr)
+ggplot(kallisto.geo.counts, aes(x = kallisto_counts, y = geo_counts)) +
+    geom_point() +
+    geom_abline() +
+    labs(x = "Kallisto counts", y = "GEO counts") +
+    scale_x_log10() +
+    scale_y_log10() +
+    theme_pubr()
+```
+
+```{r}
+kallisto.geo.counts.inner <- inner_join(kallisto.gene.counts, geo.counts)
+cor(kallisto.geo.counts.inner$kallisto_counts, kallisto.geo.counts.inner$geo_counts)
+```
+
+# Differential expression analysis
+
+```{bash, eval=FALSE}
+cd GSE135251
+ls -1 | wc -l
+```
+
+```{r}
+library(data.table)
+
+# Read every per-sample file. Each is 2 columns, no header: Ensembl gene_id + count.
+files <- list.files(here("bulk/GSE135251/"),
+                    pattern = "\\.counts\\.txt\\.gz$", full.names = TRUE)
+stopifnot(length(files) > 0)
+z <- lapply(X = files, FUN = fread, header = FALSE,
+            col.names = c("gene_id", "count"))
+
+# Name each element by its GSM accession (first "_"-delimited token of the filename)
+names(z) <- sub("_.*$", "", basename(files))
+stopifnot(!anyDuplicated(names(z)))
+```
+
+```{r}
+# Long -> wide: one row per gene_id, one column per sample (GSM), values = counts.
+counts.by.id <- rbindlist(z, idcol = "sample") %>%
+    filter(!str_starts(gene_id, "__")) %>%                    # drop HTSeq summary rows
+    mutate(gene_id = str_replace(gene_id, "\\..*", "")) %>%   # drop .1/.2 version suffix
+    group_by(gene_id, sample) %>%
+    summarise(count = sum(count), .groups = "drop") %>%       # collapse any duplicate ids
+    pivot_wider(names_from = sample, values_from = count, values_fill = 0)
+```
+
+```{r}
+# Map Ensembl gene_id -> gene symbol.
+suppressPackageStartupMessages(library(org.Hs.eg.db))
+
+symbol_map <- AnnotationDbi::mapIds(
+  org.Hs.eg.db,
+  keys      = counts.by.id$gene_id,
+  keytype   = "ENSEMBL",
+  column    = "SYMBOL",
+  multiVals = "first"
+)
+
+all_counts <- counts.by.id %>%
+    mutate(gene_name = unname(symbol_map[gene_id]),
+           gene_name = if_else(is.na(gene_name) | gene_name == "",
+                               gene_id, gene_name)) %>%        # no symbol -> use the Ensembl id
+    dplyr::select(gene_name, everything(), -gene_id) %>%    
+    dplyr::relocate(gene_name)
+
+head(all_counts)
+```
+
+```{r}
+counts <- all_counts %>% as.data.frame()
+head(counts)
+```
+
+Altenatively, you can also download counts from [here](https://www.dropbox.com/scl/fi/om24ym8s2ehw0uqn5jpdf/all_counts.zip?rlkey=eh6a1jy35t33zro1dlwrp9w12&st=zv7j6iye&dl=0)
+
+```{r}
+rownames(counts) <- make.unique(counts$gene_name)
+counts$gene_name <- NULL
+```
+
+```{r}
+metadata <- read_csv(here("bulk/GSE135251_samples.csv")) %>% as.data.frame()
+head(metadata)
+```
+
+```{r}
+ncol(metadata)
+```
+
+```{r}
+table(metadata$Stage)
+```
+
+```{r}
+rownames(metadata) <- metadata$Sample
+
+# keep only samples we have both counts AND metadata for
+shared <- intersect(colnames(counts), metadata$Sample)
+message(length(colnames(counts)), " count samples, ",
+        nrow(metadata), " annotated samples, ",
+        length(shared), " used (present in both).")
+stopifnot(length(shared) > 0)
+
+counts   <- counts[, shared, drop = FALSE]
+metadata <- metadata[shared, ]                       # reorder to match counts
+metadata$sample_name <- rownames(metadata)
+
+stopifnot(identical(rownames(metadata), colnames(counts)))
+
+# design variable: Stage has control / early / moderate; control is the reference
+metadata$stage <- relevel(factor(metadata$Stage), ref = "control")
+table(metadata$stage)
+```
+
+```{r}
+library(DESeq2)
+# DESeq2 needs an integer count matrix; kallisto est_counts can be fractional
+count_mat <- round(as.matrix(counts))
+storage.mode(count_mat) <- "integer"
+
+dds <- DESeqDataSetFromMatrix(countData = count_mat,
+                              colData = metadata,
+                              design= ~ stage)
+smallestGroupSize <- 3
+keep <- rowSums(counts(dds) >= 10) >= smallestGroupSize
+dds <- dds[keep,]
+```
+
+```{r}
+dds <- DESeq(dds)
+```
+
+## Exploratory analysis
+
+```{r}
+vsd <- vst(dds, blind=FALSE)
+```
+
+Can we normalise the data by just taking log?
+
+```{r}
+df <- data.frame(mean = log1p(rowMeans(counts)),
+variance = matrixStats::rowVars(log1p( counts %>% as.matrix())))
+
+ggplot(df, aes(mean, variance)) + geom_point() + scale_x_log10() + scale_y_log10()
+```
+
+How does DESeq2 achieve variance stabilisation?
+
+```{r}
+df <- data.frame(mean = rowMeans(counts), variance = matrixStats::rowVars(counts %>% as.matrix()))
+
+ggplot(df, aes(mean, variance)) + geom_point() + scale_x_log10() + scale_y_log10()
+```
+
+```{r}
+df.vsd <- data.frame(mean = rowMeans(assay(vsd)),
+variance = matrixStats::rowVars(assay(vsd) %>% as.matrix()))
+
+ggplot(df.vsd, aes(mean, variance)) + geom_point() + scale_x_log10() + scale_y_log10()
+```
+
+
+```{r}
+vsd$group.in.paper <- vsd$`group in paper`
+plotPCA(vsd, intgroup=c('stage'))
+```
+
+```{r}
+plotPCA(vsd, intgroup=c("stage"))
+```
+
+### PCA by hand
+
+
+`plotPCA` keeps the top 500 most variable genes, so we do the same, center each
+gene (rows), and run `prcomp` on the transposed matrix (samples as rows).
+
+```{r}
+mat <- assay(vsd)
+top_genes <- head(order(matrixStats::rowVars(mat), decreasing = TRUE), 500)
+mat_top <- mat[top_genes, ]
+
+pca <- prcomp(t(mat_top), center = TRUE, scale. = FALSE)
+
+pct <- round(100 * pca$sdev^2 / sum(pca$sdev^2), 1)
+pct[1:5]
+```
+
+`prcomp` itself is just an SVD of the centered matrix, $X = U D V^{T}$:
+
+```{r}
+X  <- scale(t(mat_top), center = TRUE, scale = FALSE)  # samples x genes, gene-centered
+sv <- svd(X)
+
+# pca$x  (sample coordinates)
+scores_svd <- sv$u %*% diag(sv$d)
+# pca$rotation (gene loadings)
+load_svd   <- sv$v   
+# pca$sdev
+sdev_svd   <- sv$d / sqrt(nrow(X) - 1) 
+
+# same up to an arbitrary per-PC sign flip
+all.equal(abs(scores_svd[, 1:5]), abs(unname(pca$x[, 1:5])))
+all.equal(sdev_svd, pca$sdev)
+round(100 * sdev_svd^2 / sum(sdev_svd^2), 1)[1:5]
+```
+
+Plot PC1 vs PC2:
+
+```{r}
+scores <- as.data.frame(pca$x)
+scores$stage <- vsd$stage
+
+ggplot(scores, aes(PC1, PC2, color = stage)) +
+  geom_point(size = 2) +
+  labs(x = paste0("PC1 (", pct[1], "%)"),
+       y = paste0("PC2 (", pct[2], "%)")) +
+  theme_pubr()
+```
+
+### Visualising the loadings
+
+The **loadings** (`pca$rotation`) give each gene's contribution to a PC. Genes with the largest |loading| define that PC.
+
+```{r}
+loadings <- as.data.frame(pca$rotation)
+loadings$gene <- rownames(loadings)
+
+# top genes driving PC1 and PC2
+top_pc1 <- loadings %>% arrange(desc(abs(PC1))) %>% head(15)
+top_pc2 <- loadings %>% arrange(desc(abs(PC2))) %>% head(15)
+top_pc1$gene
+top_pc2$gene
+```
+
+```{r}
+ggplot(top_pc2, aes(x = reorder(gene, PC2), y = PC2)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Top genes loading on PC2", x = NULL, y = "PC2 loading") +
+  theme_pubr()
+```
+
+A loadings biplot: samples as points, with the strongest PC2 gene arrows overlaid.
+
+```{r}
+arrows <- top_pc2 %>% arrange(desc(abs(PC2))) %>% head(8)
+scale_f <- 0.9 * max(abs(scores$PC2)) / max(abs(arrows$PC2))   # scale arrows to score range
+
+ggplot(scores, aes(PC1, PC2)) +
+  geom_point(aes(color = stage), size = 2) +
+  geom_segment(data = arrows,
+               aes(x = 0, y = 0, xend = PC1 * scale_f, yend = PC2 * scale_f),
+               arrow = arrow(length = unit(0.15, "cm")), color = "grey30") +
+  ggrepel::geom_text_repel(data = arrows,
+               aes(x = PC1 * scale_f, y = PC2 * scale_f, label = gene), size = 3) +
+  labs(x = paste0("PC1 (", pct[1], "%)"), y = paste0("PC2 (", pct[2], "%)")) +
+  theme_pubr()
+```
+
+Look up some gene's expression
+
+```{r}
+df = plotCounts(dds, gene="XIST", intgroup="sample_name", returnData = T)
+df
+```
+
+```{r}
+hist(df$count)
+```
+
+```{r}
+library(ggplot2)
+ggplot(df, aes(count)) + stat_ecdf(geom = "point") + theme_classic(base_size = 14)
+```
+
+```{r}
+male_samples <- df[df$count<20,]$sample_name
+```
+
+```{r}
+vsd$sex <- "female"
+vsd$sex[vsd$sample_name %in% male_samples] <- "male"
+```
+
+```{r}
+plotPCA(vsd, intgroup=c("sex"))
+```
+
+```{r}
+plotPCA(vsd, intgroup=c("disease"))
+```
+
+```{r}
+vsd.fixed <- vsd
+assay(vsd.fixed) <- limma::removeBatchEffect(assay(vsd), batch = vsd$sex)
+plotPCA(vsd.fixed, intgroup=c("stage"))
+```
+
+## DE analysis
+
+```{r}
+resultsNames(dds)   
+```
+
+```{r}
+# reference is "control"; test a disease stage against it
+case_stage <- "moderate"
+de_results <- results(dds, contrast = c("stage", case_stage, "control"))
+de_results <- de_results %>% as.data.frame()
+```
+
+```{r}
+de_results$gene <- rownames(de_results)
+de_results.pos <- de_results %>% as.data.frame() %>% dplyr::filter(log2FoldChange > 1) %>% dplyr::filter(padj < 0.05)
+```
+
+```{r}
+library(clusterProfiler)
+library(org.Hs.eg.db) # install using BiocManager::install("org.Hs.eg.db")
+de.genes <- head(de_results.pos$gene, 500)   
+universe.genes <- rownames(counts)
+ego <- enrichGO(gene          = de.genes,
+                universe      = universe.genes,
+                OrgDb         = org.Hs.eg.db, 
+                keyType = "SYMBOL",
+                ont           = "BP",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.05,
+                qvalueCutoff  = 0.05,
+        readable      = TRUE)
+head(ego)
+
+```
+
+```{r}
+barplot(ego)
+```
+
+# Volcano Plots
+
+```{r}
+# draw volcano plot from deseq2 results
+library(ggplot2)
+library(ggrepel)
+de_results$gene <- rownames(de_results)
+de_results$gene_name <- ifelse(de_results$padj < 0.05 & abs(de_results$log2FoldChange) > 1, de_results$gene, "")
+de_results$group <- ifelse(de_results$padj < 0.05 & abs(de_results$log2FoldChange) > 1, "DE", "not-DE")
+de_results$size <- ifelse(de_results$padj < 0.05 & abs(de_results$log2FoldChange) > 1, 3, 1)
+ggplot(de_results, aes(x = log2FoldChange, y = -log10(padj),
+                       color = group)) +
+    geom_point(size=0.1) +
+    geom_text_repel(aes(label = gene_name), box.padding = 0.5, show.legend = F) +
+    scale_color_brewer(palette = "Set1") +
+    labs(x = "log2 Fold Change", y = "-log10(padj)") +
+    theme_minimal()
+
+```
+

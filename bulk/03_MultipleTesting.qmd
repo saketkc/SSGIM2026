@@ -599,3 +599,6 @@ ggplot(comparison_data, aes(x = rank, y = p_value)) +
   theme(legend.position = "right") +
   guides(shape = guide_legend(title = "Truth", override.aes = list(fill = "gray")))
 ```
+
+
+

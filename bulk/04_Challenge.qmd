@@ -1,0 +1,101 @@
+
+# Challenge Problems
+
+Use everything above to answer three open questions.
+You already have `dds`, `counts`, `count_mat`, and `metadata` (with the
+XIST-inferred `sex` you computed earlier). Write your own code in the empty chunks.
+
+## Challenge 1: Sex-specific genes in healthy liver (beyond the obvious)
+
+Working **only in the `control` samples**, find genes that differ between male
+and female livers. We *expect* X/Y-linked genes (XIST, RPS4Y1, DDX3Y, UTY, ...).
+
+**Question:** Are there autosomal genes that are sex-biased in normal
+liver?
+
+Steps to think through:
+
+1. Subset to `control` samples and set the design to `~ sex`.
+2. Run DE (male vs female).
+3. Split the hits into **sex-chromosome** vs **autosomal** genes -- you'll need a
+   gene -> chromosome map (e.g. from `org.Hs.eg.db`, column `"CHR"`, or from the
+   GTF you downloaded). Report the autosomal sex-biased genes.
+
+
+```{r}
+#| eval: false
+# YOUR CODE HERE
+# hint: dds_ctrl <- dds[, dds$stage == "control"]
+#       dds_ctrl$sex <- factor(dds_ctrl$sex)
+#       design(dds_ctrl) <- ~ sex ; dds_ctrl <- DESeq(dds_ctrl)
+#       res_sex <- results(dds_ctrl, contrast = c("sex","male","female"))
+#       # then map gene -> chromosome and split X/Y vs autosomal
+```
+
+<details><summary>Hint: gene -> chromosome map</summary>
+
+```{r}
+#| eval: false
+chr_map <- AnnotationDbi::mapIds(org.Hs.eg.db,
+             keys = rownames(dds), keytype = "SYMBOL",
+             column = "CHR", multiVals = "first")
+sex_chr <- names(chr_map)[chr_map %in% c("X", "Y")]
+```
+
+</details>
+
+## Challenge 2: Is the sex effect the SAME in disease as in health?
+
+Now use **all** samples. Does any gene's male-vs-female difference
+*changes* with disease stagem i.e. a **sex x stage interaction**. A gene that
+is sex-biased in controls but not in moderate NAFLD (or vice versa) is an
+'interaction' gene.
+
+Steps:
+
+1. Design `~ sex + stage + sex:stage` (drop stages with too few of one sex --
+   check `table(metadata$sex, metadata$stage)` first; `control` has only ~10
+   samples, so the interaction there will be underpowered -- say so).
+2. Use `results()` on the interaction term (see `resultsNames(dds)`), or an LRT:
+   `DESeq(dds, test = "LRT", reduced = ~ sex + stage)`.
+3. Contrast the sex effect *within* control vs *within* moderate and list genes
+   whose sex-difference flips or appears only in one condition.
+
+Read the DESeq2 [vignette](https://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html) to understand how interactions work.
+
+```{r}
+#| eval: false
+# YOUR CODE HERE
+# hint: table(metadata$sex, metadata$stage)   
+#       design(dds) <- ~ sex + stage + sex:stage
+#       dds <- DESeq(dds, test = "LRT", reduced = ~ sex + stage)
+#       res_int <- results(dds)               
+```
+
+## Challenge 3: Genes that change *progressively* with severity
+
+`Stage` is only control / early / moderate. But the `group in paper` column has a progressive (clinical) stage of the disease:
+**control -> NAFL -> NASH_F0-F1 -> NASH_F2 -> NASH_F3 -> NASH_F4**.
+Find genes whose expression **moves monotonically** along this axis (a dose-response / progressive signature): 
+
+Two potential approaches:
+
+- **Ordered / trend test:** encode the ladder as an ordered numeric score
+  (control = 0, NAFL = 1, ... NASH_F4 = 5), put it in the design as a continuous covariate, and DE on that coefficient -> genes with a consistent slope.
+- **LRT across all levels**, then keep genes whose per-level means are monotone (increasing or decreasing) across the ordered ladder.
+
+Then: are any of your Challenge-1 autosomal sex genes ALSO progressive? Overlap the lists.
+
+```{r}
+#| eval: false
+# YOUR CODE HERE
+# hint (trend test):
+# ladder <- c("control","NAFL","NASH_F0-F1","NASH_F2","NASH_F3","NASH_F4")
+# metadata$severity <- match(metadata$`group in paper`, ladder) - 1   # 0..5
+# dds2 <- DESeqDataSetFromMatrix(count_mat, metadata, ~ severity)
+# dds2 <- DESeq(dds2)
+# res_trend <- results(dds2, name = "severity")   # slope per unit severity
+# # sort by padj; check a few top genes with plotCounts(dds2, gene=..., intgroup="group in paper")
+```
+
+Discuss: the trend test assumes a roughly linear response on the log scale. What biology would it miss (e.g. genes that spike only at NASH_F4)? How would you catch those?

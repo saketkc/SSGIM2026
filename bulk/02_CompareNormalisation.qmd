@@ -1,0 +1,225 @@
+---
+title: "Normalisation"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    df-print: kable
+date: today
+---
+
+# Overview
+
+CPM/RPKM/FPKM/TPM are all **within-sample relative** measures. CPM and TPM
+force every sample to the same total (1e6); RPKM/FPKM don't have a
+fixed column sum but still inherit the same relative-share problem. So if a few
+genes truly change a lot, they **mechanically shift every other gene, manufacturing fake DE**. This is *compositional bias*.
+
+DESeq2 estimates a per-sample **size factor** and divides it out. It works only
+under the assumption that most ($>50%$) genes are unchanged (or that up/down changes
+roughly balance). 
+RNA-seq measures *relative* abundance, so if truly all genes
+shift together, no method can recover the absolute change without adding external
+spike-ins.
+
+- CPM must **not** be used to compare two genes (ignores length).
+- DESeq2 normalised counts must **not** be used to compare two genes (not
+  length-corrected) -> Use TPM for within-sample gene-vs-gene abundance.
+
+```{r}
+set.seed(42)
+```
+
+# 1. Simulated example
+
+Here we simulate a scenario with just 6 genes across 2 conditions with 3 replicates 
+each. Only G1 and G2 truly change (both up in treated) with G3..G6  unchanged. 
+We keep the depth **equal** across all samples so the only nuisance is composition.
+
+```{r}
+gene_len_kb <- c(G1 = 10, G2 = 5, G3 = 0.5, G4 = 2, G5 = 4, G6 = 1)  # varied lengths
+
+# Only G1 & G2 truly change.
+true_ctrl <- c(G1 = 100, G2 = 100, G3 = 100, G4 = 100, G5 = 100, G6 = 100)
+true_trt  <- c(G1 = 800, G2 = 800, G3 = 100, G4 = 100, G5 = 100, G6 = 100)  # G1,G2 up 8x
+truth_changed <- c("UP","UP","no","no","no","no")
+```
+
+# 2. Truth -> observed counts
+
+Reads per gene ~ (molecules * length): longer transcripts fragment into more
+reads. Multinomial sampling at a fixed sequencing depth per sample.
+
+```{r}
+# we use a multinomial to simulate the counts
+# Rationale: Given a fixed sequencing budget (depth), the
+# number of reads per gene is a function of its inherent rate and the gene length
+simulate_counts <- function(true_mol, n_rep, depth) {
+  sapply(seq_len(n_rep), function(i) {
+    rate <- true_mol * gene_len_kb        
+    rmultinom(1, size = depth, prob = rate / sum(rate))[, 1]
+  })
+}
+
+DEPTH <- 3e6
+ctrl <- simulate_counts(true_ctrl, 3, DEPTH)
+trt  <- simulate_counts(true_trt,  3, DEPTH)
+
+counts <- cbind(ctrl, trt)
+colnames(counts) <- c(paste0("ctrl", 1:3), paste0("trt", 1:3))
+rownames(counts) <- names(gene_len_kb)
+group <- factor(rep(c("ctrl", "trt"), each = 3))
+
+cat("Raw counts:\n"); print(counts)
+cat("\nLibrary sizes (all equal by construction):\n"); print(colSums(counts))
+```
+
+# 3. Perform within sample normalisation
+
+```{r}
+cpm  <- function(m) sweep(m, 2, colSums(m), "/") * 1e6
+rpkm <- function(m, len_kb) sweep(cpm(m), 1, len_kb, "/")   # also called FPKM ( for paired-end)
+tpm  <- function(m, len_kb) {                                
+  rpk <- sweep(m, 1, len_kb, "/")
+  sweep(rpk, 2, colSums(rpk), "/") * 1e6
+}
+CPM  <- cpm(counts)
+RPKM <- rpkm(counts, gene_len_kb)
+TPM  <- tpm(counts, gene_len_kb)
+
+log2fc <- function(mat) log2(rowMeans(mat[, 4:6]) / rowMeans(mat[, 1:3]))
+```
+
+# Compare two genes in the same sample
+Let's compare G1 and G3 in ctrl1 samples:
+
+```{r}
+print(data.frame(
+  true_molecules = true_ctrl[c("G1","G3")],
+  length_kb      = gene_len_kb[c("G1","G3")],
+  CPM  = round(CPM [c("G1","G3"), "ctrl1"]),
+  TPM  = round(TPM [c("G1","G3"), "ctrl1"])
+))
+```
+CPM says G1 >> G3, but that's because of their length. TPM makes them comparable within sample.
+
+
+# Differential Expression
+
+G3..G6 did **not** change in truth. What log2 fold-change does each within-sample
+method report for them?
+
+First expose the mechanism directly: G3's raw read **share** (its CPM/1e6) falls
+from ctrl to trt even though its molecule count is fixed -- because the shared
+denominator (total reads) grew when G1,G2 took over. The fold change is fake the
+moment the denominator changed.
+
+```{r}
+print(data.frame(
+  ctrl_share_ppm = round(rowMeans(CPM[, 1:3])["G3"]),
+  trt_share_ppm  = round(rowMeans(CPM[, 4:6])["G3"]),
+  row.names = "G3"
+))
+cat("Same molecules, smaller slice of a budget G1,G2 now dominate.\n")
+```
+
+Fold-changes of genes that TRULY did not change:
+ 
+```{r}
+fc_tab <- data.frame(
+  truth_changed = truth_changed,
+  CPM  = round(log2fc(CPM),  2),
+  RPKM = round(log2fc(RPKM), 2),
+  TPM  = round(log2fc(TPM),  2)
+)
+print(fc_tab)
+```
+A couple of failures that you will notice above:
+
+1) Fake DE:  G3..G6 never changed, yet CPM/RPKM/TPM all call them clearly
+
+2) Deflated True DE:  G1,G2 are truly up 8x (log2FC=3), but CPM/RPKM shrink
+
+# DESeq2 size factors (median-of-ratios)
+
+- Step 1: Build a pseudo-reference sample (geometric mean per gene).
+  For each gene (with no zeros) $g$, take the geometric mean of its counts across all $n$ samples:
+  $$
+  \hat{K}^{\text{ref}}g = \left(\prod_{i=1}^{n} K_{gi}\right)^{1/n} = \exp\left(\frac{1}{n}\sum_{i=1}^{n} \log
+  K_{gi}\right)
+  $$
+-   Step 2: Ratio to the reference, per gene, within each sample.
+  For each sample $i$ and each gene:
+  $$
+  r_{gi} = \frac{K_{gi}}{\hat{K}^{\text{ref}}_g}
+  $$
+  "How many times the typical level is this gene in this sample?"
+- Step 3: Size factor = median of those ratios.
+  $$
+  s_i =\underset{g}{\operatorname{median}}\; r_{gi}
+  $$
+- Step 4: Normalise. Divide each column by its size factor:
+
+
+```{r}
+suppressPackageStartupMessages(library(DESeq2))
+dds <- DESeqDataSetFromMatrix(counts, data.frame(condition = group), ~condition)
+dds <- estimateSizeFactors(dds)
+dds <- DESeqDataSetFromMatrix(counts, data.frame(condition = group), ~condition)
+dds <- estimateSizeFactors(dds)
+sf       <- sizeFactors(dds)                 # DESeq2 median-of-ratios
+norm_mor <- counts(dds, normalized = TRUE)   # = sweep(counts, 2, sf, "/")
+
+print(round(sf, 3))
+
+cat("\nFold-changes after median-of-ratios normalisation:\n")
+print(data.frame(truth_changed  = fc_tab$truth_changed,
+               MedianOfRatios = round(log2fc(norm_mor), 2)))
+```
+
+G3..G6 are at ~0 (unchanged, correct) and only G1,G2 read as UP (which is what we simulated)
+to compare two genes within a sample.
+
+```{r}
+print(data.frame(
+  true_molecules      = true_ctrl[c("G1","G3")],
+  length_kb           = gene_len_kb[c("G1","G3")],
+  DESeq2_norm         = round(norm_mor[c("G1","G3"), "ctrl1"]),
+  TPM                 = round(TPM     [c("G1","G3"), "ctrl1"])
+))
+```
+DESeq2-normalised G1 >> G3 (length again). TPM shows them equal
+DESeq2 normalised counts are **not** length-corrected, so they must not be used
+
+
+
+# Summary: what to use when
+
+| Comparison you want to make | Use | Why / caveat |
+|---|---|---|
+| A gene **across** samples/conditions (DE) | DESeq2 / edgeR / limma-voom | Size-factor / TMM normalisation corrects for composition + depth |
+| Two genes **within** one sample (abundance) | TPM | Length-aware; ≈ relative (**not** absolute) molecular abundance, still affected by isoform / effective length |
+| CPM / RPKM / FPKM / TPM **across** conditions | No | Compositional bias → fake DE |
+| DESeq2 normalised counts to rank gene A vs B | o | Not length-corrected |
+
+
+# Homework 1
+
+Implement your equivalent `from_scratch` of `sizeFactors` function from DESeq2:
+
+```{r}
+from_scratch <- 1 # replace this with your implementation of size factors
+print(rbind(from_scratch = round(from_scratch, 3),
+          DESeq2        = round(sizeFactors(dds), 3)))
+
+```
+
+
+# Homework 2
+
+Unequal depth + composition together: Show size factors absorb **both** the depth and the composition shift, while CPM only removes depth (bias remains).
+
+```{r}
+ctrl2 <- simulate_counts(true_ctrl, 3, 6e6)   # ctrl 2x deeper
+trt2  <- simulate_counts(true_trt,  3, 3e6)
+```
