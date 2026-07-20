@@ -2,33 +2,25 @@
 title: "Multiple hypothesis testing: A primer"
 ---
 
-## The problem of multiple testing.
+## The problem of multiple testing
 
-Imagine you're developing a diagnostic panel to detect cancer. You've identified 500 genes that *might* be associated with cancer risk. Your task: determine which genes are **truly** associated with cancer vs. which associations are just due to chance.
+Say you are developing a diagnostic panel and have 500 candidate genes that might be associated with cancer risk. You want to know which genes are truly associated and which associations arose by chance.
 
-To do this, you: 1. Measure expression levels of all 500 genes in cancer patients vs. healthy controls 2. Perform a statistical test (like a t-test) for each gene to see if expression differs between groups 3.
+For each gene you measure expression in cases vs. controls and run a statistical test (say a t-test).
 
-When you perform **one** statistical test with α = 0.05, you accept a 5% chance of a false positive (Type I error).
+One test at α = 0.05 carries a 5% chance of a false positive (Type I error). With 500 independent tests at α = 0.05:
 
-When you perform **500** independent tests, all with α = 0.05:
+$$\Pr(\text{at least one false positive}) = 1 - (1 - 0.05)^{500} = 1 - (0.95)^{500} \approx 0.99999$$
 
-$$\text{Probability of at least one false positive} = 1 - (1 - 0.05)^{500}$$
-
-Let's calculate this:
-
-$$\text{Probability} = 1 - (0.95)^{500} = 1 - 0.0000085 \approx 99.9999\%$$
-
-**You are almost guaranteed to find false positives!**
+So you will end up something significant (by chance) even when nothing really is.
 
 ## Why does this happen?
 
-If you flip a fair coin 5 times expecting all heads, the probability is low: (0.5)\^5 = 3.1%. But if you flip 500 coins each once, how many will be heads just by chance? About 250!
+Think of each null gene test as a biased coin that lands heads (a false positive) with probability α = 0.05. One flip rarely comes up heads. But  if you flip 500 such coins once each you expect $500 \times 0.05 = 25$ heads. So what was a rare head per-coin event becomes common once you have enough coins.
 
-In our gene panel: - We have 500 "coins" (genes) - We flip each once (perform one test per gene) - At α = 0.05, we expect **500 × 0.05 = 25 false positives** just from random chance
+So if all 500 genes were truly null, you would still expect ~25 to cross p < 0.05 by chance.
 
-Similarly, when we test 500 genes and find **30 genes** with p-value \< 0.05. **At expected value**, \~25 of these are false positives - Only **\~5 might be truly associated** with cancer
-
-So publishing all 30 genes would mean: - **83% false discovery rate** (25 false positives out of 30). Patients tested on these genes get misleading results. Everyone wastes time studying false leads.
+Now suppose the panel flags 30 genes and only a handful of the 500 are genuinely associated. About 25 of the 30 are chance hits and only ~5 are real, an 83% false discovery rate. Reporting all 30 would give patients misleading results and send everyone chasing false leads.
 
 This is the **multiple testing problem**.
 
@@ -51,7 +43,7 @@ mytheme <- theme_minimal() +
 
 ### Visualising the problem
 
-Let's simulate what happens when we test 100 hypotheses where **none are actually true** (all null hypotheses are true):
+Simulate 100 tests where every null is true:
 
 ```{r multiple-testing-demo}
 n_tests <- 100
@@ -80,11 +72,11 @@ ggplot(hist_data, aes(x = p_value)) +
   mytheme
 ```
 
-We found `{r} n_significant` "significant" results even though **nothing was real**! This is the problem we need to solve.
+We found `{r} n_significant` "significant" results with nothing real behind them.
 
-## But again, what is the problem?
+## Types of error
 
-When we do multiple tests, we need to think about different types of errors:
+Across many tests, four outcomes are possible:
 
 ```{r error-types-table}
 error_matrix <- data.frame(
@@ -106,70 +98,28 @@ knitr::kable(error_matrix[, 1:3],
 )
 ```
 
-### The two different error rates
+### Two error rates
 
-**Family-Wise Error Rate (FWER)**: The probability of making **even one** false positive. Like saying "I want zero mistakes" --> Very conservative - protects you strongly but may miss real discoveries.  Bonferroni correction controls FWER.
+**Family-Wise Error Rate (FWER)** is the probability of making even one false positive across the whole family of tests. Controlling it is conservative: you make few false calls but miss real effects. Bonferroni controls FWER.
 
-**False Discovery Rate (FDR)**: Among all discoveries you make, what **proportion** are false? Like saying "I'm okay if 5% of my findings are false positives" --> More flexible - lets you find more real effects while controlling false positives. Benjamini-Hochberg controls FDR
+**False Discovery Rate (FDR)** is the expected fraction of your discoveries that are false. Controlling it is more permissive: you tolerate, say, 5% false calls among the ones you report, and in exchange you recover more real effects. Benjamini-Hochberg controls FDR.
 
-### An intuitive analogy
-
-Imagine you're running a cancer diagnostic clinic and you've developed a panel of 500 genetic markers. You
-  use it to screen patients:
-
-#### Without Multiple testing correction
-
-"We'll flag anyone with abnormal markers as high-risk"
-- You flag 30 patients as having cancer risk
-- But 25 of them are actually fine (false alarms)
-- Result: 83% of your "positive" diagnoses are wrong
-- Patients get unnecessary anxiety, costly treatments, wrong decisions
-
-#### FWER - Bonferroni (Ultra-Conservative)
-
-"We want to be 95% certain we don't mis-diagnose ANY patient"
-- You only flag patients with the clearest, most obvious markers
-- You correctly identify 3 patients with real cancer risk
-- BUT you miss 27 patients who actually have cancer risk (false negatives)
-- Result: Everyone you flag is definitely high-risk, but you let many sick patients walk out thinking
-they're fine
-
-#### FDR - Benjamini-Hochberg (balanced)
-
-"We're okay if 5% of our high-risk diagnoses turn out to be false"
-- You flag 8 patients as high-risk
-- You expect about 0.4 of them to ultimately be false alarms (5% of 8)
-- Result: You catch more real cases (8 vs 3), but accept that roughly 1 in 20 "high-risk" calls might be
-wrong
-- These 8 patients get further testing—some are confirmed, a few aren't—but no major harm done
-
-#### Summary
-
-Bonferroni = Assuming your screening test is terrible at ruling out false alarms, so you only act on the
-most obvious cases
-
-FDR = Accepting that some of your calls will be wrong (5%), but since you're following up with confirmatory
-testing anyway, it's fine—you catch more real cases
-
-In a clinic, you'd never use Bonferroni alone because you'd miss too much cancer. You'd use FDR for the
-initial panel, then confirm with follow-up tests.
+### Clinical setting
 
 ## The Benjamini-Hochberg procedure
 
-The Benjamini-Hochberg (BH) method is surprisingly simple and elegant. Here's how it works:
+### The algorithm
 
-### The algorithm 
+1.  Sort all p-values from smallest to largest
+2.  Number them: i = 1, 2, 3, ..., m (where m is total number of tests)
+3.  Calculate threshold for each test: (i/m) × α (where α is your desired FDR, usually 0.05)
+4.  Find the largest i where: p-value ≤ (i/m) × α
+5.  Reject all hypotheses from 1 to i
 
-1.  **Sort** all p-values from smallest to largest
-2.  **Number** them: i = 1, 2, 3, ..., m (where m is total number of tests)
-3.  **Calculate** threshold for each test: (i/m) × α (where α is your desired FDR, usually 0.05)
-4.  **Find** the largest i where: p-value ≤ (i/m) × α
-5.  **Reject** all hypotheses from 1 to i
-
-Let's see this using a demo:
+A worked simulation:
 
 ```{r bh-visual-demo}
-# Simulate a more realistic scenario: 100 tests, 20 are truly significant
+#  100 tests, 20 are truly significant
 set.seed(123)
 n_tests <- 100
 n_true <- 20
@@ -242,13 +192,13 @@ ggplot(test_data, aes(x = rank, y = p_value)) +
   theme(legend.position = "right")
 ```
 
-### What's happening here?
+### Reading the plot
 
-The **blue line** is the BH threshold: it starts small and gradually increases. This is the key insight!
+The blue line is the BH threshold, which rises with rank:
 
--   **Small p-values (left side)**: Easy to reject --> the threshold is low but so are the p-values
--   **Larger p-values (right side)**: Threshold increases, allowing more discoveries
--   **The magic**: BH finds the **largest rank** where p-value still crosses below the line
+-   On the left, p-values are small and easily fall under the (low) threshold.
+-   On the right, the threshold is higher, so it can reject larger p-values.
+-   BH finds the largest rank where the p-value is still below the line, and rejects everything up to it.
 
 ```{r bh-results-table}
 results_summary <- test_data %>%
@@ -264,22 +214,15 @@ knitr::kable(results_summary,
 )
 ```
 
-Notice how: - **Benjamini-Hochberg** found `{r} sum(test_data$significant_bh)` significant tests - **Bonferroni** only found `{r} sum(test_data$significant_bonf)` significant tests - The truth: `{r} n_true` tests actually have real effects
-
-BH gives us more power to detect real effects while still controlling false discoveries!
+BH found `{r} sum(test_data$significant_bh)` significant tests; Bonferroni found `{r} sum(test_data$significant_bonf)`; the truth is `{r} n_true` real effects. BH recovers more of the real effects while still controlling false discoveries.
 
 ## Why does this work?
 
-The genius of BH is in the **increasing threshold**. Here's why it works:
-
 ### The ranking creates protection
 
-1.  **True effects tend to have small p-values** → They cluster on the left
-2.  **False positives are randomly scattered** → They're spread throughout
-3.  **By sorting p-values**, we naturally group most true effects together
-4.  **The increasing threshold** allows us to be more lenient as we move right, where we're less likely to find true effects anyway
+True effects tend to have small p-values, so they cluster at the low ranks, while a true null gives a Uniform(0,1) p-value that could land anywhere. Sorting groups most real effects near the front. The threshold at rank $i$ is $(i/m)\alpha$, rising by only $\alpha/m$ per step. Because null p-values are uniform, the chance that any one null falls under the threshold is just the threshold itself, so across all $m_0$ nulls the expected number of false rejections stays bounded by $m_0\alpha/m \le \alpha$ times the number of discoveries. That is what caps the FDR while the early-ranking real effects still get rejected.
 
-### Visual intuition
+### The stopping rule
 
 ```{r staircase-visual}
 # Zoom in on the first 30 tests
@@ -308,27 +251,19 @@ ggplot(zoom_data, aes(x = rank, y = p_value)) +
   theme(legend.position = "right")
 ```
 
-Think of it like **climbing a staircase**: - You keep climbing (accepting tests as significant) - As long as p-values stay below the rising threshold - Once a p-value exceeds the threshold, you stop
+BH finds the *largest* rank whose p-value still sits under the threshold, then rejects every test up to that rank.
 
 ## The mathematical intuition
 
-You don't need heavy math to understand why BH works, but a little intuition helps!
-
 ### Why the (i/m) × α formula?
 
-The BH procedure uses the threshold: **p(i) ≤ (i/m) × α**
+The threshold is $p_{(i)} \le (i/m)\,\alpha$, where:
 
-Let's break down what each part means:
+-   $i$ = the rank of this p-value (1 = smallest)
+-   $m$ = total number of tests
+-   $\alpha$ = target FDR (e.g. 0.05)
 
--   **i** = the rank of this p-value (1st smallest, 2nd smallest, etc.)
--   **m** = total number of tests
--   **α** = your target FDR (e.g., 0.05)
-
-**The intuition**: As you accept more tests (increasing i), you're allowed a slightly more lenient threshold. Why? Because:
-
-1.  **True effects cluster at small p-values** - they naturally rank early
-2.  **The ratio i/m grows slowly** - you're not being too generous
-3.  **The method "spends" your error budget** across all tests efficiently
+As you accept more tests (larger $i$) the threshold relaxes. That is safe because true effects cluster at small p-values and rank early, and the ratio $i/m$ grows slowly, so the procedure spends its error budget gradually rather than all at once.
 
 ### Example
 
@@ -365,27 +300,15 @@ knitr::kable(math_example[1:5, ],
 )
 ```
 
-Notice: - **Rank 1**: Threshold = 0.005 (very strict, like Bonferroni: 0.05/10) - **Rank 5**: Threshold = 0.025 (halfway to α) - **Rank 10**: Threshold = 0.050 (same as unadjusted!)
-
-The **increasing threshold** is the key innovation!
+At rank 1 the threshold is 0.005 (as strict as Bonferroni, 0.05/10); at rank 5 it is 0.025; at rank 10 it is 0.050, the same as no correction at all.
 
 ### Why does this control FDR?
 
-The mathematical proof is complex, but here's the intuitive idea:
+The full proof is technical. But an intuition could work: Suppose there are $m_0$ true nulls and $m_1$ true alternatives. Under a true null a p-value is Uniform(0,1), while true alternatives concentrate near 0. Sorting all p-values together pushes the nulls toward the high ranks, where the relaxed threshold still rejects only a controlled fraction of them. Working through the algebra, the expected fraction of false discoveries is at most $\alpha \, (m_0/m) \le \alpha$.
 
-**Setup**: Suppose you have m₀ true null hypotheses (no effect) and m₁ true alternatives (real effects).
+One consequence: the more true effects there are, the better BH does, because the alternatives fill the low ranks and crowd the nulls out.
 
-**Under the nulls**: P-values are uniformly distributed between 0 and 1.
-
-**The clever part**: When you sort all p-values together, the true nulls are "diluted" by the true alternatives (which have small p-values). By using the increasing threshold (i/m) × α, the procedure:
-
-1.  **Mostly rejects true alternatives early** (they have small p-values)
-2.  **Occasionally accepts a null by mistake** (but this is bounded!)
-3.  **The math shows**: On average, ≤ α × (m₀/m) ≤ α fraction of discoveries are false
-
-**Key insight**: The more true effects you have, the better BH performs (true alternatives "protect" against false positives by filling up the low ranks).
-
-### Visualizing the Math
+### More true effects, more protection
 
 ```{r math-visualization}
 set.seed(444)
@@ -439,11 +362,11 @@ ggplot(combined_data, aes(x = rank, y = p_value)) +
   theme(legend.position = "top")
 ```
 
-When there are many true effects (right panel), they dominate the low ranks, making it harder for false positives (nulls) to sneak in. This is why BH becomes more efficient when there are more real effects!
+With many true effects (right panel) the reds fill the low ranks and leave fewer openings for nulls, so BH gains power.
 
 ## Example: Gene expression analysis
 
-Let's walk through a realistic example with gene expression data.
+Consider a larger example: 1000 genes, 50 of them truly differentially expressed.
 
 ```{r practical-example}
 # Simulate gene expression study
@@ -506,7 +429,7 @@ knitr::kable(performance,
 )
 ```
 
-### What do we learn?
+### Discoveries by method
 
 ```{r performance-viz}
 # Reshape for plotting
@@ -542,15 +465,16 @@ ggplot(perf_long, aes(x = Method, y = Count, fill = Type)) +
 ```
 
 
-1.  **Unadjusted**: Finds many true positives BUT also many false positives (high FDR)
-2.  **Bonferroni**: Very few false positives BUT misses many true discoveries (low power)
-3.  **Benjamini-Hochberg**: Balances both - good power with controlled FDR ✓
+Unadjusted testing finds many true positives but also many false ones. Bonferroni makes almost no false calls but misses most of the real effects. BH sits between them, keeping good power while holding the FDR down.
 
-The actual FDR for BH is `{r} performance$FDR_Actual[3]`, which is at or below our target of 0.05!
+The realised false-discovery proportion for BH in this run is
+`{r} performance$FDR_Actual[3]`. FDR is controlled *in expectation* (E[V/R] ≤ α),
+not on every single run, so this one number can land above or below 0.05; averaged
+over many simulations it settles at or under the target.
 
-## Comparing methods
+## Comparing the rejection regions
 
-A  comprehensive comparison showing the different "rejection regions":
+Overlaying both thresholds shows which genes each method rejects.
 
 ```{r method-comparison, fig.width=8, fig.height=5}
 comparison_data <- gene_data %>%
