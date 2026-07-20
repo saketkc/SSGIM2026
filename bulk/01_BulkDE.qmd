@@ -15,9 +15,12 @@ date: today
 #| message: false
 pkgs <- c("tidyverse", "ggpubr", "here", "data.table", "DESeq2", "matrixStats",
           "limma", "clusterProfiler", "org.Hs.eg.db", "ggrepel")
+
 missing_pkgs <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]
-if (length(missing_pkgs))
-  stop("Install these first: ", paste(missing_pkgs, collapse = ", "))
+if (length(missing_pkgs)) {
+  if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+  BiocManager::install(missing_pkgs, update = FALSE, ask = FALSE)
+}
 
 library(here)
 need_files <- c("bulk/cdna/t2g.csv", "bulk/GSE135251_samples.csv", "bulk/GSE135251")
@@ -75,6 +78,8 @@ wget --content-disposition -c "https://www.dropbox.com/scl/fi/dpbslasta98e05tru1
 ```
 
 Download the metadata from  https://seqout.org/p/GSE135251
+
+Make sure you have 216 samples in the dataset
 
 Also available [here](https://www.dropbox.com/scl/fi/uk6o1s2cegl77gcma7r81/GSE135251_samples.csv?rlkey=2nzbodzezbpx5qm79t35stwr8&st=m801enqd&dl=0)
 
