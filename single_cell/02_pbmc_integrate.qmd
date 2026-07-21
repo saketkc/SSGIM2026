@@ -1,0 +1,151 @@
+---
+title: "Integration: horizontal integration of PBMC3k + PBMC4k, and label transfer"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    embed-resources: true
+date: today
+---
+
+# Setup
+
+```{r}
+setRepositories(ind = 1:3)
+required.packages <- c("Seurat", "BiocManager", "harmony", "glmGamPoi", "remotes", "batchelor")
+InstallMissing <- function(packages) {
+    for (pkg in packages) {
+        if (!require(pkg, character.only = TRUE)) {
+            install.packages(pkg, dependencies = TRUE)
+            library(pkg, character.only = TRUE)
+        }
+    }
+}
+
+remotes::install_github("satijalab/seurat-wrappers")
+```
+
+```{r}
+library(Seurat)
+library(dplyr)
+library(SeuratWrappers)
+```
+
+# Load and merge the two datasets
+
+Download the query dataset `pbmc4k` which we will annotate from [here](https://www.dropbox.com/scl/fi/qvy00944y56ja953nf2v9/pbmc4k.rds?rlkey=zit84xgh36pqho4f8lafoo0qn&st=bkopiy8v&dl=0) and the annotated `pbmc3k` dataset from [here](https://www.dropbox.com/scl/fi/tbjbnljsd0iowikfzxeu2/pbmc3k_annotated.rds?rlkey=surqa1nw8th5i7in8st6gmk2j&st=fmcawk75&dl=0). Note that in an ideal world, your reference annotated object
+will have more cells than the query.
+
+```{r}
+# EDIT THIS
+PBMC3k_path <- "~/github/SSGIM2026/single_cell/pbmc3k_annotated.rds"
+PBMC4k_path <- "~/github/SSGIM2026/single_cell/pbmc4k.rds"
+
+pbmc3k <- readRDS(PBMC3k_path)
+pbmc3k$dataset <- "pbmc3k"
+pbmc4k <- readRDS(PBMC4k_path)
+pbmc4k$dataset <- "pbmc4k"
+
+# Merge the two datasets
+merged <- merge(pbmc3k, y = pbmc4k, add.cell.ids = c("pbmc3k", "pbmc4k"))
+```
+
+# Standard workflow on the merged (uncorrected) data
+
+```{r}
+merged <- NormalizeData(merged) %>%
+  FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>%
+  ScaleData() %>%
+  RunPCA(npcs = 30) %>%
+  FindNeighbors(dims = 1:20) %>%
+  RunUMAP(dims = 1:20)
+
+# Do the datasets merge into each other well?
+DimPlot(merged, reduction = "umap", group.by = "dataset")
+
+merged <- FindClusters(merged, resolution = 0.3)
+merged$merged_cluster <- Idents(merged)
+
+DimPlot(merged, reduction = "umap", group.by = "merged_cluster", label = TRUE)
+DimPlot(merged, reduction = "umap", group.by = c("dataset", "merged_cluster"), label = TRUE)
+```
+
+# Integrate: MNN, Harmony, CCA
+
+```{r}
+merged <- JoinLayers(merged)
+merged[["RNA"]] <- split(merged[["RNA"]], f = merged$dataset)
+merged <- NormalizeData(merged) %>% FindVariableFeatures() %>%
+  ScaleData() %>%
+  RunPCA()
+
+integrated <-  IntegrateLayers(object = merged, method = FastMNNIntegration,
+                                   orig.reduction = "pca",
+                                   new.reduction = "integrated.mnn",
+                                          verbose = FALSE)
+integrated <- IntegrateLayers(
+    object = integrated, method = HarmonyIntegration,
+    orig.reduction = "pca", new.reduction = "integrated.harmony",
+    verbose = FALSE
+)
+integrated <- IntegrateLayers(
+    object = integrated, method = CCAIntegration,
+    orig.reduction = "pca", new.reduction = "integrated.cca",
+    verbose = FALSE
+)
+```
+
+# Compare integrations
+
+```{r}
+integrated <- FindNeighbors(integrated, reduction = "integrated.cca", dims = 1:20)
+integrated <- FindClusters(integrated, resolution = 0.3, cluster.name = "cca_clusters")
+integrated <- RunUMAP(integrated, reduction = "integrated.cca", dims = 1:20,
+                      reduction.name = "umap.cca")
+
+DimPlot(integrated, reduction = "umap.cca",
+        group.by = c("dataset", "merged_cluster", "cca_clusters"), label = TRUE)
+
+integrated <- FindNeighbors(integrated, reduction = "integrated.harmony", dims = 1:20)
+integrated <- FindClusters(integrated, resolution = 0.3, cluster.name = "harmony_clusters")
+integrated <- RunUMAP(integrated, reduction = "integrated.harmony", dims = 1:20,
+                      reduction.name = "umap.harmony")
+
+DimPlot(integrated, reduction = "umap.harmony",
+        group.by = c("dataset", "harmony_clusters", "cca_clusters"), label = TRUE)
+```
+
+# Label transfer: annotate pbmc4k from pbmc3k
+
+We can use the same idea to *transfer* annotation from pbmc3k to pbmc4k.
+
+```{r}
+pbmc3k <- NormalizeData(pbmc3k) %>%
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>%
+    ScaleData() %>%
+    RunPCA(npcs = 30) %>%
+    FindNeighbors(dims = 1:20) %>%
+    RunUMAP(dims = 1:20)
+pbmc4k <- NormalizeData(pbmc4k) %>%
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>%
+    ScaleData()  %>%
+    RunPCA(npcs = 30) %>%
+    FindNeighbors(dims = 1:20) %>%
+    RunUMAP(dims = 1:20)
+
+anchors <- FindTransferAnchors(reference = pbmc3k,
+                               query = pbmc4k,
+                               dims = 1:30,
+                               reference.reduction = "pca")
+predictions <- TransferData(anchorset = anchors, refdata = pbmc3k$seurat_annotations,
+                            dims = 1:30)
+pbmc4k <- AddMetaData(pbmc4k, metadata = predictions)
+DimPlot(pbmc4k, group.by = "predicted.id")
+```
+
+UMAP is only for visualisation -- always check using markers if the results
+make sense.
+
+```{r}
+markers.B <- FindMarkers(object = pbmc4k, ident.1 = "B", only.pos = TRUE, group.by = "predicted.id")
+```

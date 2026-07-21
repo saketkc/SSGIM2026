@@ -1,0 +1,1972 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="dcterms.date" content="2026-07-21">
+
+<title>Analysis of single=cell RNA-seq data: Signatures of Alzheimer’s</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="01_scrna_files/libs/clipboard/clipboard.min.js"></script>
+<script src="01_scrna_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="01_scrna_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="01_scrna_files/libs/quarto-html/popper.min.js"></script>
+<script src="01_scrna_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="01_scrna_files/libs/quarto-html/anchor.min.js"></script>
+<link href="01_scrna_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="01_scrna_files/libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="01_scrna_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="01_scrna_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="01_scrna_files/libs/bootstrap/bootstrap-138a6193a3bd40baf1e627da441a4734.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Analysis of single=cell RNA-seq data: Signatures of Alzheimer’s</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">July 21, 2026</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="how-should-i-run-this-notebook" class="level1">
+<h1>How should I run this notebook?</h1>
+<p>The easiest way to run each of the steps in this notebook is to download the raw file from Github, open it in Rstudio and run each code block one by one.</p>
+</section>
+<section id="biological-background" class="level1">
+<h1>Biological background</h1>
+<p>Alzheimer’s disease (AD) is the most common form of dementia. Demential is a broad umbrella term for all major major neurocognitive disorders that impairs a person’s ability to remember, think, or make decisions. Pathologically, the disease is believed to occur when amyloid beta (A<span class="math inline">\(\beta\)</span>) peptides accumulates abnormally in the extracellular space. This is followed by intraneuronal tau hyperphosphorylation and aggregation which causes neuronal and synaptic dysfunction and cell death.</p>
+<p>The brain is made of different celltypes which can broadly be classified into three categories: excitatory, inhibitory and non-neuronal cells. Non-neuronal cells comprise of glial cells, ependymal cells, endothelial cells and pericytes. Glial cells can be further subdivided into macroglia (astrocytes and oligdendrocytes) and microglia - the primary immune cells of the central nervous system.</p>
+<p>A number of studies have shown that among all the celltypes, microglia undergo the most prominent changes in AD brains. This is evident in two forms: 1) a change in cellular composition with AD brains exhibiting higher number of microglia and 2) a robust transcriptional activation signal in the microglia cells. The activated microglia is referred to as DAM (Disease associated microglia) and has a distinct transcriptional signature than the homoeostatic microglia (control). This signal is conserved in mouse models (5xFAD) of AD. Multiple studies have also characterized the impact of genetic variants in the TREM2 gene. Loss of TREM2 in mice AD model (5XFAD) restricts the ability of microglia to surround A<span class="math inline">\(\beta\)</span> plaques.</p>
+<p>In this vignette, following <a href="https://pubmed.ncbi.nlm.nih.gov/31932797/">Zhou et al., 2020</a> we will investigate the changes associated with AD pathology and TREM2 deficit brains from 5XFAD mice undergoing A<span class="math inline">\(\beta\)</span> accumulation.</p>
+</section>
+<section id="download-the-object" class="level1">
+<h1>Download the object</h1>
+For this vignette, we will focus on a single-cell dataset coprising 27,999 cells profiled from 15 month old mice. You can download the raw object <a href="https://www.dropbox.com/scl/fi/9hoh6nys27bxj3w9h1mxb/Stage15_all.rds?rlkey=ylihkddnis1gttyqne9v4r5cm&amp;st=6zpeisyn&amp;e=1&amp;dl=0">here</a> and then set the <code>PATH</code> variable in the codeblock below pointing it to the correct path on your machine. For details about how the object was created see details below.
+<details>
+<summary>
+QC steps
+</summary>
+<section id="downloading-raw-files-from-geo" class="level2">
+<h2 class="anchored" data-anchor-id="downloading-raw-files-from-geo">Downloading raw files from GEO</h2>
+<p>The raw counts matrices were deposited by authors on <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE140511">GEO</a>. To download all the files, you can either download the <a href="https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE140511&amp;format=file">.zip</a> or use <code>wget</code>:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># run in terminal</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>wget <span class="sc">-</span>c <span class="sc">--</span>content<span class="sc">-</span>disposition <span class="st">"https://www.ncbi.nlm.nih.gov/geo/download/?acc=GS</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="st">E140511&amp;format=file"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="quality-control-to-discard-low-quality-cells" class="level2">
+<h2 class="anchored" data-anchor-id="quality-control-to-discard-low-quality-cells">Quality control to discard low-quality cells</h2>
+<p>Once the files have been downloaded, we use <code>ReadMtx</code> to read the raw files and create one object per sample using the <code>CreateSeuratObject</code> function. Ultimately, we merge these objects into one object with appropriate steps for adding metadata and use the criteria defined by original authors for retaining high quality cells:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>sample_names<span class="fl">.7</span> <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"GSM4173504_WT_1"</span>, <span class="st">"GSM4173505_WT_2"</span>, <span class="st">"GSM4173506_WT_3"</span>,</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"GSM4173507_Trem2_KO_1"</span>, <span class="st">"GSM4173508_Trem2_KO_2"</span>, <span class="st">"GSM4173509_Trem2_KO_3"</span>,</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"GSM4173510_WT_5XFAD_1"</span>, <span class="st">"GSM4173511_WT_5XFAD_2"</span>, <span class="st">"GSM4173512_WT_5XFAD_3"</span>,</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"GSM4173513_Trem2_KO_5XFAD_1"</span>, <span class="st">"GSM4173514_Trem2_KO_5XFAD_2"</span>, <span class="st">"GSM4173515_Trem2_KO_5XFAD_3"</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>objects.list <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (sample <span class="cf">in</span> sample_names<span class="fl">.7</span>) {</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  counts <span class="ot">&lt;-</span> <span class="fu">ReadMtx</span>(</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">mtx =</span> <span class="fu">file.path</span>(<span class="st">"data/Mouse_TREM2_data/"</span>, <span class="fu">paste0</span>(sample, <span class="st">"_matrix.mtx.gz"</span>)),</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">cells =</span> <span class="fu">file.path</span>(<span class="st">"data/Mouse_TREM2_data/"</span>, <span class="fu">paste0</span>(sample, <span class="st">"_barcodes.tsv.gz"</span>)),</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">features =</span> <span class="fu">file.path</span>(<span class="st">"data/Mouse_TREM2_data/"</span>, <span class="fu">paste0</span>(sample, <span class="st">"_features.tsv.gz"</span>))</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>  object <span class="ot">&lt;-</span> <span class="fu">CreateSeuratObject</span>(<span class="at">counts =</span> counts, <span class="at">project =</span> sample, <span class="at">min.cells =</span> <span class="dv">5</span>, <span class="at">min.features =</span> <span class="dv">5</span>)</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>  object[[<span class="st">"percent.mt"</span>]] <span class="ot">&lt;-</span> <span class="fu">PercentageFeatureSet</span>(<span class="at">object =</span> object, <span class="at">pattern =</span> <span class="st">"^mt-"</span>)</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>  object <span class="ot">&lt;-</span> <span class="fu">subset</span>(object, nCount_RNA <span class="sc">&gt;=</span> <span class="dv">300</span> <span class="sc">&amp;</span> nCount_RNA <span class="sc">&lt;</span> <span class="dv">9001</span> <span class="sc">&amp;</span> nFeature_RNA <span class="sc">&gt;=</span> <span class="dv">300</span> <span class="sc">&amp;</span> nFeature_RNA <span class="sc">&lt;</span> <span class="dv">5601</span> <span class="sc">&amp;</span> percent.mt <span class="sc">&lt;</span> <span class="dv">5</span>)</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Add a new column to the object to store the percentage of UMIs originating from mitochondrial genes (these beging with mt- such as my-Cytb)</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>  object[[<span class="st">"percent.mt"</span>]] <span class="ot">&lt;-</span> <span class="fu">PercentageFeatureSet</span>(<span class="at">object =</span> object, <span class="at">pattern =</span> <span class="st">"^mt-"</span>)</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Rename the cells by prefixing a sample id to make sure the cell names are unique when merging</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>  object <span class="ot">&lt;-</span> <span class="fu">RenameCells</span>(<span class="at">object =</span> object, <span class="at">add.cell.id =</span> sample)</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>  object<span class="sc">$</span>sample_name <span class="ot">&lt;-</span> sample</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>  objects.list[[sample]] <span class="ot">&lt;-</span> object</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>object <span class="ot">&lt;-</span> <span class="fu">merge</span>(objects.list[[<span class="dv">1</span>]], objects.list[<span class="dv">2</span><span class="sc">:</span><span class="fu">length</span>(objects.list)])</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="co"># 82973 samples</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>object<span class="sc">$</span>sample_name2 <span class="ot">&lt;-</span> <span class="fu">gsub</span>(<span class="at">pattern =</span> <span class="st">"Trem2_KO"</span>, <span class="at">replacement =</span> <span class="st">"Trem2KO"</span>, <span class="at">x =</span> object<span class="sc">$</span>sample_name)</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>object<span class="sc">$</span>genotype <span class="ot">&lt;-</span> stringr<span class="sc">::</span><span class="fu">str_split_fixed</span>(<span class="at">string =</span> object<span class="sc">$</span>sample_name2, <span class="at">pattern =</span> <span class="st">"_"</span>, <span class="at">n =</span> <span class="cn">Inf</span>)[, <span class="dv">2</span>]</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>object<span class="sc">$</span>mouse_model <span class="ot">&lt;-</span> <span class="st">"WT"</span></span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>object<span class="sc">$</span>mouse_model[<span class="fu">grepl</span>(<span class="at">pattern =</span> <span class="st">"5XFAD"</span>, <span class="at">x =</span> object<span class="sc">$</span>sample_name2)] <span class="ot">&lt;-</span> <span class="st">"5XFAD"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+</details></section>
+<section id="loading-data" class="level1">
+<h1>Loading data</h1>
+<p>Before we begin, please make sure you have all the necessary packages installed. In addition to <code>Seurat</code>, <code>tidyverse</code>, <code>ggrepel</code>, and <code>glmGamPoi</code>, we will also install <code>reshape2</code> and <code>enrichR</code> pacakges</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">setRepositories</span>(<span class="at">ind =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>) <span class="co"># set repositories to install Bioconductor dependencies</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>pkgs <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Seurat"</span>, <span class="st">"tidyverse"</span>, <span class="st">"ggrepel"</span>, <span class="st">"glmGamPoi"</span>, <span class="st">"reshape2"</span>, <span class="st">"org.Mm.eg.db"</span>, <span class="st">"org.Hs.eg.db"</span>, <span class="st">"clusterProfiler"</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>missing_pkgs <span class="ot">&lt;-</span> pkgs[<span class="sc">!</span><span class="fu">vapply</span>(pkgs, requireNamespace, <span class="fu">logical</span>(<span class="dv">1</span>), <span class="at">quietly =</span> <span class="cn">TRUE</span>)]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code></code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code></code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code></code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">length</span>(missing_pkgs)) {</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">requireNamespace</span>(<span class="st">"BiocManager"</span>, <span class="at">quietly =</span> <span class="cn">TRUE</span>)) <span class="fu">install.packages</span>(<span class="st">"BiocManager"</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  BiocManager<span class="sc">::</span><span class="fu">install</span>(missing_pkgs, <span class="at">update =</span> <span class="cn">FALSE</span>, <span class="at">ask =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>We can read the object by providing it an appropriate path (make sure you have downloaded the object first):</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">suppressPackageStartupMessages</span>({</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(Seurat)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">library</span>(tidyverse)</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>PATH <span class="ot">&lt;-</span> <span class="st">"~/github/SSGIM2026/single_cell/Stage15_all.rds"</span>  <span class="co"># EDIT THIS</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>object <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(PATH)</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>object <span class="ot">&lt;-</span> <span class="fu">JoinLayers</span>(object)</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="fu">theme_set</span>(<span class="fu">theme_classic</span>(<span class="at">base_size =</span> <span class="dv">14</span>)) <span class="co"># set ggplot2 theme</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="exploring-the-object" class="level1">
+<h1>Exploring the object</h1>
+<p>Before we do any downstream processing, it is always a good idea to explore the object at hand.</p>
+<p>The counts (UMIs) are stored in the “counts” slot of the “RNA” assay”. You can read about the details of how Seurat stores its information on this <a href="https://github.com/satijalab/seurat/wiki/Assay">wiki page</a>.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>counts <span class="ot">&lt;-</span> object<span class="sc">@</span>assays<span class="sc">$</span>RNA<span class="sc">@</span>layers<span class="sc">$</span>counts</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>counts <span class="ot">&lt;-</span> object<span class="sc">@</span>assays<span class="sc">$</span>RNA<span class="sc">$</span>counts</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="co"># how the first 5 gene' and first 5 cell counts</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>counts[<span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>]</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>5 x 5 sparse Matrix of class "dgCMatrix"
+       GSM4160643_WT_Cor_AAACCTGAGACCCACC-1
+Xkr4                                      .
+Sox17                                     .
+Mrpl15                                    .
+Lypla1                                    .
+Tcea1                                     .
+       GSM4160643_WT_Cor_AAACCTGAGAGTAAGG-1
+Xkr4                                      .
+Sox17                                     .
+Mrpl15                                    .
+Lypla1                                    .
+Tcea1                                     .
+       GSM4160643_WT_Cor_AAACCTGAGCGATGAC-1
+Xkr4                                      .
+Sox17                                     .
+Mrpl15                                    .
+Lypla1                                    .
+Tcea1                                     1
+       GSM4160643_WT_Cor_AAACCTGAGTCAAGCG-1
+Xkr4                                      .
+Sox17                                     .
+Mrpl15                                    .
+Lypla1                                    .
+Tcea1                                     .
+       GSM4160643_WT_Cor_AAACCTGCAAAGCGGT-1
+Xkr4                                      .
+Sox17                                     .
+Mrpl15                                    .
+Lypla1                                    .
+Tcea1                                     .</code></pre>
+</div>
+</div>
+<p>In total we have 27999 cells (columns) and 17953 genes (rows):</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">dim</span>(counts)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 17953 27999</code></pre>
+</div>
+</div>
+<p>Among these entries, we can calculate how many proportion of entries are non-zero:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="dv">100</span> <span class="sc">*</span> <span class="fu">round</span>(<span class="fu">sum</span>(counts <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="sc">/</span> (<span class="fu">dim</span>(counts)[<span class="dv">1</span>] <span class="sc">*</span> <span class="fu">dim</span>(counts)[<span class="dv">2</span>]), <span class="dv">2</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 4</code></pre>
+</div>
+</div>
+<p>So 96% of entries in the <code>counts</code> matrix are zeroes (or only 4% of the values in the entire matrix are non-zeros).</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># take a look at the object metadata</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(object)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                                            orig.ident nCount_RNA nFeature_RNA
+GSM4160643_WT_Cor_AAACCTGAGACCCACC-1 GSM4160643_WT_Cor       2018          708
+GSM4160643_WT_Cor_AAACCTGAGAGTAAGG-1 GSM4160643_WT_Cor        952          403
+GSM4160643_WT_Cor_AAACCTGAGCGATGAC-1 GSM4160643_WT_Cor       1447          769
+GSM4160643_WT_Cor_AAACCTGAGTCAAGCG-1 GSM4160643_WT_Cor       1893          878
+GSM4160643_WT_Cor_AAACCTGCAAAGCGGT-1 GSM4160643_WT_Cor       2023          875
+GSM4160643_WT_Cor_AAACCTGCAAGCGATG-1 GSM4160643_WT_Cor       1258          746
+GSM4160643_WT_Cor_AAACCTGCAAGTAGTA-1 GSM4160643_WT_Cor       1131          512
+GSM4160643_WT_Cor_AAACCTGCAGTATAAG-1 GSM4160643_WT_Cor       1790          868
+GSM4160643_WT_Cor_AAACCTGCATCCGTGG-1 GSM4160643_WT_Cor       1253          831
+GSM4160643_WT_Cor_AAACCTGCATGCGCAC-1 GSM4160643_WT_Cor       1459          563
+                                     percent.mt       sample_name
+GSM4160643_WT_Cor_AAACCTGAGACCCACC-1  0.3964321 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGAGAGTAAGG-1  0.1050420 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGAGCGATGAC-1  0.5528680 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGAGTCAAGCG-1  0.4754358 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCAAAGCGGT-1  0.1482946 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCAAGCGATG-1  0.3974563 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCAAGTAGTA-1  0.2652520 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCAGTATAAG-1  0.3910615 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCATCCGTGG-1  4.5490822 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCATGCGCAC-1  1.3022618 GSM4160643_WT_Cor
+                                          sample_name2 genotype region
+GSM4160643_WT_Cor_AAACCTGAGACCCACC-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGAGAGTAAGG-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGAGCGATGAC-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGAGTCAAGCG-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCAAAGCGGT-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCAAGCGATG-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCAAGTAGTA-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCAGTATAAG-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCATCCGTGG-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCATGCGCAC-1 GSM4160643_WT_Cor       WT Cortex
+                                     mouse_model
+GSM4160643_WT_Cor_AAACCTGAGACCCACC-1          WT
+GSM4160643_WT_Cor_AAACCTGAGAGTAAGG-1          WT
+GSM4160643_WT_Cor_AAACCTGAGCGATGAC-1          WT
+GSM4160643_WT_Cor_AAACCTGAGTCAAGCG-1          WT
+GSM4160643_WT_Cor_AAACCTGCAAAGCGGT-1          WT
+GSM4160643_WT_Cor_AAACCTGCAAGCGATG-1          WT
+GSM4160643_WT_Cor_AAACCTGCAAGTAGTA-1          WT
+GSM4160643_WT_Cor_AAACCTGCAGTATAAG-1          WT
+GSM4160643_WT_Cor_AAACCTGCATCCGTGG-1          WT
+GSM4160643_WT_Cor_AAACCTGCATGCGCAC-1          WT</code></pre>
+</div>
+</div>
+<p>You can add a custom column to the metadata using:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># add a new metadata column</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>object<span class="sc">$</span>my_column <span class="ot">&lt;-</span> <span class="st">"test"</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(object)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                                            orig.ident nCount_RNA nFeature_RNA
+GSM4160643_WT_Cor_AAACCTGAGACCCACC-1 GSM4160643_WT_Cor       2018          708
+GSM4160643_WT_Cor_AAACCTGAGAGTAAGG-1 GSM4160643_WT_Cor        952          403
+GSM4160643_WT_Cor_AAACCTGAGCGATGAC-1 GSM4160643_WT_Cor       1447          769
+GSM4160643_WT_Cor_AAACCTGAGTCAAGCG-1 GSM4160643_WT_Cor       1893          878
+GSM4160643_WT_Cor_AAACCTGCAAAGCGGT-1 GSM4160643_WT_Cor       2023          875
+GSM4160643_WT_Cor_AAACCTGCAAGCGATG-1 GSM4160643_WT_Cor       1258          746
+GSM4160643_WT_Cor_AAACCTGCAAGTAGTA-1 GSM4160643_WT_Cor       1131          512
+GSM4160643_WT_Cor_AAACCTGCAGTATAAG-1 GSM4160643_WT_Cor       1790          868
+GSM4160643_WT_Cor_AAACCTGCATCCGTGG-1 GSM4160643_WT_Cor       1253          831
+GSM4160643_WT_Cor_AAACCTGCATGCGCAC-1 GSM4160643_WT_Cor       1459          563
+                                     percent.mt       sample_name
+GSM4160643_WT_Cor_AAACCTGAGACCCACC-1  0.3964321 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGAGAGTAAGG-1  0.1050420 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGAGCGATGAC-1  0.5528680 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGAGTCAAGCG-1  0.4754358 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCAAAGCGGT-1  0.1482946 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCAAGCGATG-1  0.3974563 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCAAGTAGTA-1  0.2652520 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCAGTATAAG-1  0.3910615 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCATCCGTGG-1  4.5490822 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCATGCGCAC-1  1.3022618 GSM4160643_WT_Cor
+                                          sample_name2 genotype region
+GSM4160643_WT_Cor_AAACCTGAGACCCACC-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGAGAGTAAGG-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGAGCGATGAC-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGAGTCAAGCG-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCAAAGCGGT-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCAAGCGATG-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCAAGTAGTA-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCAGTATAAG-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCATCCGTGG-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCATGCGCAC-1 GSM4160643_WT_Cor       WT Cortex
+                                     mouse_model my_column
+GSM4160643_WT_Cor_AAACCTGAGACCCACC-1          WT      test
+GSM4160643_WT_Cor_AAACCTGAGAGTAAGG-1          WT      test
+GSM4160643_WT_Cor_AAACCTGAGCGATGAC-1          WT      test
+GSM4160643_WT_Cor_AAACCTGAGTCAAGCG-1          WT      test
+GSM4160643_WT_Cor_AAACCTGCAAAGCGGT-1          WT      test
+GSM4160643_WT_Cor_AAACCTGCAAGCGATG-1          WT      test
+GSM4160643_WT_Cor_AAACCTGCAAGTAGTA-1          WT      test
+GSM4160643_WT_Cor_AAACCTGCAGTATAAG-1          WT      test
+GSM4160643_WT_Cor_AAACCTGCATCCGTGG-1          WT      test
+GSM4160643_WT_Cor_AAACCTGCATGCGCAC-1          WT      test</code></pre>
+</div>
+</div>
+<p>Or delete the column from the metadata:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>object<span class="sc">$</span>my_column <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(object)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                                            orig.ident nCount_RNA nFeature_RNA
+GSM4160643_WT_Cor_AAACCTGAGACCCACC-1 GSM4160643_WT_Cor       2018          708
+GSM4160643_WT_Cor_AAACCTGAGAGTAAGG-1 GSM4160643_WT_Cor        952          403
+GSM4160643_WT_Cor_AAACCTGAGCGATGAC-1 GSM4160643_WT_Cor       1447          769
+GSM4160643_WT_Cor_AAACCTGAGTCAAGCG-1 GSM4160643_WT_Cor       1893          878
+GSM4160643_WT_Cor_AAACCTGCAAAGCGGT-1 GSM4160643_WT_Cor       2023          875
+GSM4160643_WT_Cor_AAACCTGCAAGCGATG-1 GSM4160643_WT_Cor       1258          746
+GSM4160643_WT_Cor_AAACCTGCAAGTAGTA-1 GSM4160643_WT_Cor       1131          512
+GSM4160643_WT_Cor_AAACCTGCAGTATAAG-1 GSM4160643_WT_Cor       1790          868
+GSM4160643_WT_Cor_AAACCTGCATCCGTGG-1 GSM4160643_WT_Cor       1253          831
+GSM4160643_WT_Cor_AAACCTGCATGCGCAC-1 GSM4160643_WT_Cor       1459          563
+                                     percent.mt       sample_name
+GSM4160643_WT_Cor_AAACCTGAGACCCACC-1  0.3964321 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGAGAGTAAGG-1  0.1050420 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGAGCGATGAC-1  0.5528680 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGAGTCAAGCG-1  0.4754358 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCAAAGCGGT-1  0.1482946 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCAAGCGATG-1  0.3974563 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCAAGTAGTA-1  0.2652520 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCAGTATAAG-1  0.3910615 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCATCCGTGG-1  4.5490822 GSM4160643_WT_Cor
+GSM4160643_WT_Cor_AAACCTGCATGCGCAC-1  1.3022618 GSM4160643_WT_Cor
+                                          sample_name2 genotype region
+GSM4160643_WT_Cor_AAACCTGAGACCCACC-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGAGAGTAAGG-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGAGCGATGAC-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGAGTCAAGCG-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCAAAGCGGT-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCAAGCGATG-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCAAGTAGTA-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCAGTATAAG-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCATCCGTGG-1 GSM4160643_WT_Cor       WT Cortex
+GSM4160643_WT_Cor_AAACCTGCATGCGCAC-1 GSM4160643_WT_Cor       WT Cortex
+                                     mouse_model
+GSM4160643_WT_Cor_AAACCTGAGACCCACC-1          WT
+GSM4160643_WT_Cor_AAACCTGAGAGTAAGG-1          WT
+GSM4160643_WT_Cor_AAACCTGAGCGATGAC-1          WT
+GSM4160643_WT_Cor_AAACCTGAGTCAAGCG-1          WT
+GSM4160643_WT_Cor_AAACCTGCAAAGCGGT-1          WT
+GSM4160643_WT_Cor_AAACCTGCAAGCGATG-1          WT
+GSM4160643_WT_Cor_AAACCTGCAAGTAGTA-1          WT
+GSM4160643_WT_Cor_AAACCTGCAGTATAAG-1          WT
+GSM4160643_WT_Cor_AAACCTGCATCCGTGG-1          WT
+GSM4160643_WT_Cor_AAACCTGCATGCGCAC-1          WT</code></pre>
+</div>
+</div>
+<p>You can plot some QC metrics using the <code>VlnPlot</code> command:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">VlnPlot</span>(object, <span class="at">features =</span> <span class="fu">c</span>(<span class="st">"nCount_RNA"</span>, <span class="st">"nFeature_RNA"</span>, <span class="st">"percent.mt"</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: Default search for "data" layer in "RNA" assay yielded no results;
+utilizing "counts" layer instead.</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-11-1.png" class="img-fluid figure-img" width="1440"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>You can see the help associated with this (or any function) function by typing ‘?VlnPlot’ in the RStudio console.</p>
+</section>
+<section id="feature-selection" class="level1">
+<h1>Feature Selection</h1>
+<p>Many genes in this dataset are “not informative” - they are either lowly expressed overall, or expressed in all the celltypes. For downstream analysis, we want to identify “informative” genes - this increases the signal to noise ratio for downstream dimensionaloty reduction.</p>
+<p>One way to select these genes would be to calculate a per-gene variance and select the ones with the highest variance. Let’s explore the mean-variance relationship of these genes:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co"># get UMI counts from object</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>counts <span class="ot">&lt;-</span> <span class="fu">GetAssayData</span>(<span class="at">object =</span> object, <span class="at">assay =</span> <span class="st">"RNA"</span>, <span class="at">layer =</span> <span class="st">"counts"</span>)</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a><span class="co"># calculate per gene mean</span></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>gene_mean <span class="ot">&lt;-</span> <span class="fu">rowMeans</span>(<span class="at">x =</span> counts)</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>gene_variance <span class="ot">&lt;-</span> <span class="fu">apply</span>(<span class="at">X =</span> counts, <span class="at">MARGIN =</span> <span class="dv">1</span>, <span class="at">FUN =</span> var)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning in asMethod(object): sparse-&gt;dense coercion: allocating vector of size
+3.7 GiB</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> <span class="fu">data.frame</span>(<span class="st">"gene_mean"</span> <span class="ot">=</span> gene_mean, <span class="st">"gene_variance"</span> <span class="ot">=</span> gene_variance), <span class="fu">aes</span>(gene_mean, gene_variance)) <span class="sc">+</span></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_abline</span>(<span class="at">color=</span><span class="st">"red"</span>)<span class="sc">+</span></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_log10</span>() <span class="sc">+</span></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_y_log10</span>() <span class="sc">+</span></span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xlab</span>(<span class="st">"Gene mean"</span>) <span class="sc">+</span></span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ylab</span>(<span class="st">"Gene variance"</span>) <span class="sc">+</span></span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>(<span class="at">base_size =</span> <span class="dv">14</span>) </span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning in scale_x_log10(): log-10 transformation introduced infinite values.</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning in scale_y_log10(): log-10 transformation introduced infinite values.</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-12-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>So genes with higher means will also have higher variance because there is a strong mean-variance relationship exhibited by all genes. One way to adjust for this relationship is to explicitly model the mean-variance relationship by fitting a smooth curve and then identify genes that show high deviation from this “expected” pattern. This is essentially what is done inside the <code>FindVariableFeatures</code> function:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>object <span class="ot">&lt;-</span> <span class="fu">FindVariableFeatures</span>(<span class="at">object =</span> object, <span class="at">selection.method =</span> <span class="st">"vst"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Finding variable features for layer counts</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="fu">VariableFeaturePlot</span>(object)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning in scale_x_log10(): log-10 transformation introduced infinite values.</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-13-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>In the plot above, the “variable genes” are highlhted in red and as clear from their mean values are not necessarily the most highly expressed (notice the genes with average expression &gt; 10)</p>
+<section id="normalization" class="level2">
+<h2 class="anchored" data-anchor-id="normalization">Normalization</h2>
+<p>The total number of UMIs observed for a cell are attributable to 1) cell size (higher cell size =&gt; more RNA content =&gt; more expected UMIs) and 2) sequencing depth. Let’s look at the expression of a ubiquoulsy expressed gene (Malat1- a long noncoding RNA):</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>total_umis <span class="ot">&lt;-</span> <span class="fu">colSums</span>(<span class="at">x =</span> counts)</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>gene <span class="ot">&lt;-</span> <span class="st">"Malat1"</span></span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>gene_umi <span class="ot">&lt;-</span> <span class="fu">as.numeric</span>(counts[gene, ])</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> <span class="fu">data.frame</span>(<span class="st">"total_cell_umi"</span> <span class="ot">=</span> total_umis, <span class="st">"gene_umi"</span> <span class="ot">=</span> gene_umi), <span class="fu">aes</span>(total_cell_umi, gene_umi)) <span class="sc">+</span></span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>(<span class="at">base_size =</span> <span class="dv">14</span>) <span class="sc">+</span> <span class="fu">xlab</span>(<span class="st">"Total sequencing depth"</span>) <span class="sc">+</span> <span class="fu">ylab</span>(<span class="fu">paste0</span>(<span class="st">"Gene UMI("</span>, gene))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-14-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>This gene (Malat1) shows an almost linear relationship with sequencing depth of a cell. In this case the “heterogeneity across cells” in expression levels of Malat1 are primarly attributable to the fact that these cells were sequenced to different deths and is un interesting.</p>
+<p>If all the genes showed this linear behavior we could have simply “regressed” out the effect of sequencing depth by performing a linear regression of observed gene count agaisnt the total sequencing depth of the cell. But it is not a good idea because there are also marker genes such as Apoe (an astrocytes marker), Vip (a marker for Vip interneurons - these are a type of inhibitory neurons) and C1qa (a marker of microglia)</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>data.to.plot <span class="ot">&lt;-</span> <span class="fu">FetchData</span>(<span class="at">object =</span> object, <span class="at">layer =</span> <span class="st">"counts"</span>, <span class="at">vars =</span> <span class="fu">c</span>(<span class="st">"Apoe"</span>, <span class="st">"Vip"</span>, <span class="st">"C1qa"</span>, <span class="st">"nCount_RNA"</span>))</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(data.to.plot)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                                     Apoe Vip C1qa nCount_RNA
+GSM4160643_WT_Cor_AAACCTGAGACCCACC-1    0   0    0       2018
+GSM4160643_WT_Cor_AAACCTGAGAGTAAGG-1    0   0    0        952
+GSM4160643_WT_Cor_AAACCTGAGCGATGAC-1    0   0    0       1447
+GSM4160643_WT_Cor_AAACCTGAGTCAAGCG-1    0   0    0       1893
+GSM4160643_WT_Cor_AAACCTGCAAAGCGGT-1    0   0    1       2023
+GSM4160643_WT_Cor_AAACCTGCAAGCGATG-1    0   0    0       1258</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>data.to.plot.genewise <span class="ot">&lt;-</span> reshape2<span class="sc">::</span><span class="fu">melt</span>(data.to.plot, <span class="at">id.vars =</span> <span class="st">"nCount_RNA"</span>)</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(data.to.plot.genewise, <span class="fu">aes</span>(nCount_RNA, value)) <span class="sc">+</span></span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>variable) <span class="sc">+</span></span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xlab</span>(<span class="st">"Sequencing depth"</span>) <span class="sc">+</span></span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ylab</span>(<span class="st">"Gene UMI"</span>) <span class="sc">+</span></span>
+<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>(<span class="at">base_size =</span> <span class="dv">14</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-16-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Given these are marker genes, they are only expressed in a subset of cells. A simple linear regression where we regress out the sequencing depth from each gene’s UMI will end up affecting these marker genes negatively - dampening their expression.</p>
+<section id="log-normalization" class="level3">
+<h3 class="anchored" data-anchor-id="log-normalization">Log Normalization</h3>
+<p>Instead of regressing out sequencing depth, an alternate idea is to to use a global scale factor (say 10,000) and “scale” all cells to have this sequencing depth while also accounting for the sequencing depth of the cell. To reduce the impact of outliers, these scaled values are log transformed (after adding a pseudocount of 1). To perform this normalizing using Seurat, you can use the <code>NormalizeData</code> function:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>object <span class="ot">&lt;-</span> <span class="fu">NormalizeData</span>(<span class="at">object =</span> object, <span class="at">scale.factor =</span> <span class="fu">median</span>(object<span class="sc">$</span>nCount_RNA))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Normalizing layer: counts</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>object <span class="ot">&lt;-</span> <span class="fu">ScaleData</span>(<span class="at">object =</span> object)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Centering and scaling data matrix</code></pre>
+</div>
+</div>
+</section>
+<section id="what-is-good-normalization" class="level3">
+<h3 class="anchored" data-anchor-id="what-is-good-normalization">What is “good normalization”?</h3>
+<p>There are two key properties that any “good normalization” method should achieve:</p>
+<ol type="1">
+<li><p>The normalized expression values of a gene should have minimal dependence on the seuquencing depth</p></li>
+<li><p>The variance of normalized gene expression values across should cells should primarily reflect biological variation and not technical noise and should be independent of gene’s mean expression level or sequencing depth of the cell.</p></li>
+</ol>
+<p>Let’s look into the expression pattern of the same highly expressed gene after running Log Normalization:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>gene <span class="ot">&lt;-</span> <span class="st">"Malat1"</span></span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a><span class="co"># normalized values are stored in the "data" slot</span></span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>object <span class="ot">&lt;-</span> <span class="fu">NormalizeData</span>(<span class="at">object =</span> object, <span class="at">scale.factor =</span> <span class="dv">10000</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Normalizing layer: counts</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>lognormalized.data <span class="ot">&lt;-</span> <span class="fu">GetAssayData</span>(<span class="at">object =</span> object, <span class="at">assay =</span> <span class="st">"RNA"</span>, <span class="at">layer =</span> <span class="st">"data"</span>)[gene, ]</span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="fu">data.frame</span>(<span class="st">"sequencing_depth"</span> <span class="ot">=</span> <span class="fu">colSums</span>(<span class="at">x =</span> counts), <span class="st">"normalized_values"</span> <span class="ot">=</span> lognormalized.data), <span class="fu">aes</span>(sequencing_depth, normalized_values)) <span class="sc">+</span></span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>(<span class="at">base_size =</span> <span class="dv">14</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-18-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Compare this relationship with an earlier figure where we were plotting the raw expression values - the correlation between y and x axis has reduced significantly. But as we will see in the next figure, this correlation is not zero.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb43"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>counts <span class="ot">&lt;-</span> <span class="fu">GetAssayData</span>(<span class="at">object =</span> object, <span class="at">assay =</span> <span class="st">"RNA"</span>, <span class="at">layer =</span> <span class="st">"counts"</span>)</span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>lognormalized.data <span class="ot">&lt;-</span> <span class="fu">GetAssayData</span>(<span class="at">object =</span> object, <span class="at">assay =</span> <span class="st">"RNA"</span>, <span class="at">layer =</span> <span class="st">"data"</span>)</span>
+<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a><span class="co"># compute per gene correlation with sequencing depth of each cell</span></span>
+<span id="cb43-5"><a href="#cb43-5" aria-hidden="true" tabindex="-1"></a>var.features <span class="ot">&lt;-</span> <span class="fu">VariableFeatures</span>(<span class="at">object =</span> object)</span>
+<span id="cb43-6"><a href="#cb43-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-7"><a href="#cb43-7" aria-hidden="true" tabindex="-1"></a>corr.counts <span class="ot">&lt;-</span> <span class="fu">apply</span>(<span class="at">X =</span> counts[var.features, ], <span class="at">MARGIN =</span> <span class="dv">1</span>, <span class="at">FUN =</span> <span class="cf">function</span>(x) <span class="fu">cor</span>(<span class="at">x =</span> x, <span class="at">y =</span> <span class="fu">colSums</span>(<span class="at">x =</span> counts)))</span>
+<span id="cb43-8"><a href="#cb43-8" aria-hidden="true" tabindex="-1"></a>corr.lognorm <span class="ot">&lt;-</span> <span class="fu">apply</span>(<span class="at">X =</span> lognormalized.data[var.features, ], <span class="at">MARGIN =</span> <span class="dv">1</span>, <span class="at">FUN =</span> <span class="cf">function</span>(x) <span class="fu">cor</span>(<span class="at">x =</span> x, <span class="at">y =</span> <span class="fu">colSums</span>(<span class="at">x =</span> counts)))</span>
+<span id="cb43-9"><a href="#cb43-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-10"><a href="#cb43-10" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">corr =</span> <span class="fu">c</span>(corr.counts, corr.lognorm), <span class="at">type =</span> <span class="fu">c</span>(</span>
+<span id="cb43-11"><a href="#cb43-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rep</span>(<span class="st">"Raw counts"</span>, <span class="fu">length</span>(corr.counts)),</span>
+<span id="cb43-12"><a href="#cb43-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rep</span>(<span class="st">"Log normalized"</span>, <span class="fu">length</span>(corr.lognorm))</span>
+<span id="cb43-13"><a href="#cb43-13" aria-hidden="true" tabindex="-1"></a>))</span>
+<span id="cb43-14"><a href="#cb43-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-15"><a href="#cb43-15" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> df, <span class="fu">aes</span>(corr, <span class="at">fill =</span> type)) <span class="sc">+</span></span>
+<span id="cb43-16"><a href="#cb43-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_histogram</span>() <span class="sc">+</span></span>
+<span id="cb43-17"><a href="#cb43-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>(<span class="at">base_size =</span> <span class="dv">14</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>`stat_bin()` using `bins = 30`. Pick better value `binwidth`.</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-19-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="one-step-normalization-and-feature-selection-sctransform" class="level2">
+<h2 class="anchored" data-anchor-id="one-step-normalization-and-feature-selection-sctransform">One step normalization and feature selection: SCTransform</h2>
+<p>A second way to achieve variance stabilization (and variable feature selection) is by using SCTransform. In SCTransform, we use a regularized negative binomial model to directly model the single-cell counts. The normalized counts are then cacluclated by reversing this general reltaionship by substituting the observed count depth as the median sequencing depth. You can read the SCTransform publication for more details (<a href="https://genomebiology.biomedcentral.com/articles/10.1186/s13059-021-02584-9">SCTransform</a> <a href="https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1874-1">SCTransform-v2</a>).</p>
+<p>We will use SCTransform based analysis for the rest of the work flow.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb45"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>object <span class="ot">&lt;-</span> <span class="fu">SCTransform</span>(<span class="at">object =</span> object, </span>
+<span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a>                      <span class="at">vst.flavor =</span> <span class="st">"v2"</span>, <span class="at">verbose =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Compare the correlation of SCT normalized data with sequencing depth:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>sct.data <span class="ot">&lt;-</span> <span class="fu">GetAssayData</span>(<span class="at">object =</span> object, <span class="at">assay =</span> <span class="st">"SCT"</span>, <span class="at">layer =</span> <span class="st">"data"</span>)</span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a>corr.sct <span class="ot">&lt;-</span> <span class="fu">apply</span>(<span class="at">X =</span> sct.data[<span class="fu">intersect</span>(var.features, <span class="fu">rownames</span>(sct.data)), ], <span class="at">MARGIN =</span> <span class="dv">1</span>, <span class="at">FUN =</span> <span class="cf">function</span>(x) <span class="fu">cor</span>(<span class="at">x =</span> x, <span class="at">y =</span> <span class="fu">colSums</span>(<span class="at">x =</span> counts)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero
+Warning in cor(x = x, y = colSums(x = counts)): the standard deviation is zero</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb48"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">corr =</span> <span class="fu">c</span>(corr.counts, corr.lognorm, corr.sct), <span class="at">type =</span> <span class="fu">c</span>(</span>
+<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rep</span>(<span class="st">"counts"</span>, <span class="fu">length</span>(corr.counts)),</span>
+<span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rep</span>(<span class="st">"Log normalized"</span>, <span class="fu">length</span>(corr.lognorm)), <span class="fu">rep</span>(<span class="st">"SCT normalized"</span>, <span class="fu">length</span>(corr.sct))</span>
+<span id="cb48-4"><a href="#cb48-4" aria-hidden="true" tabindex="-1"></a>))</span>
+<span id="cb48-5"><a href="#cb48-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb48-6"><a href="#cb48-6" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span> df, <span class="fu">aes</span>(corr, <span class="at">fill =</span> type)) <span class="sc">+</span></span>
+<span id="cb48-7"><a href="#cb48-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_histogram</span>() <span class="sc">+</span></span>
+<span id="cb48-8"><a href="#cb48-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_bw</span>(<span class="at">base_size =</span> <span class="dv">14</span>) </span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>`stat_bin()` using `bins = 30`. Pick better value `binwidth`.</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: Removed 242 rows containing non-finite outside the scale range
+(`stat_bin()`).</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-21-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="linear-dimensionality-reduction" class="level2">
+<h2 class="anchored" data-anchor-id="linear-dimensionality-reduction">Linear Dimensionality reduction</h2>
+<p>While we measured around 17000 genes, the “intrinsic” dimensionality of data is smaller - we do not expect all 17000 genes to be orthogonal (“independent” measurements). There will be “modules” of genes that are co-expressed. We want to reduce the dimensioanloty of this dataset to a) enhance the signal to noise ratio and b) visualize this information. A common strategy in this case is to use Principle Component Analysis (PCA) which is a linear dimensionalty reduction method that outputs a smaller (20-50 usually, but upto n-1 PCs in a n dimensional dataset) orthologonal dimensions.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb51"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a>object <span class="ot">&lt;-</span> <span class="fu">RunPCA</span>(<span class="at">object =</span> object, <span class="at">npcs =</span> <span class="dv">50</span>, <span class="at">verbose =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>Rather than including all the PCs, we want to retain the most informative PCs. The goal here is to avoid adding extra PCs that might reflect other sources of variation (technical) assuming the major source of variation in the dataset is biological.</p>
+<p>One way to visualize the “intrinsic dimensionality” of this dataset is to to see how the variance explained by individual PCs varies in the form of an elbow plot:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb52"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ElbowPlot</span>(object, <span class="at">ndims =</span> <span class="dv">30</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-23-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The standard deviation (sequare root of variance) seems to plateau around PC30, so we will retain 30 PCs for downstream visualization and clustering.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb53"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(object)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-24-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="non-linear-dimensionality-reduction" class="level2">
+<h2 class="anchored" data-anchor-id="non-linear-dimensionality-reduction">Non linear dimensionality reduction</h2>
+<p>While he previous PCA analysis resulted in 30 dimensions, we want to further reduce the dimension of our dataset to 2 to be able to visualize it. While there are different methods to do this, we will utilize Uniform Manifold Approximation and Projection (UMAP). The goal of UMAP and related dimensionality reduction methods is to find a set of 2-D coordinates for the multidimensional input dataset such that the difference in cell-cell similarities between the low-dimensional and original-dimension dataset is minimized.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb54"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a>object <span class="ot">&lt;-</span> <span class="fu">RunUMAP</span>(object, <span class="at">reduction =</span> <span class="st">"pca"</span>, <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: The default method for RunUMAP has changed from calling Python UMAP via reticulate to the R-native UWOT using the cosine metric
+To use Python UMAP via reticulate, set umap.method to 'umap-learn' and metric to 'correlation'
+This message will be shown once per session</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>06:59:25 UMAP embedding parameters a = 0.9922 b = 1.112</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>06:59:25 Read 27999 rows and found 30 numeric columns</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>06:59:25 Using Annoy for neighbor search, n_neighbors = 30</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>06:59:25 Building Annoy index with metric = cosine, n_trees = 50</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>0%   10   20   30   40   50   60   70   80   90   100%</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>[----|----|----|----|----|----|----|----|----|----|</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>**************************************************|
+06:59:26 Writing NN index file to temp file /var/folders/gl/sfjd74gn0wv11h31lr8v2cj40000gn/T//Rtmp6FPjMD/file96b74abc4306
+06:59:26 Searching Annoy index using 1 thread, search_k = 3000
+06:59:31 Annoy recall = 100%
+06:59:32 Commencing smooth kNN distance calibration using 1 thread with target n_neighbors = 30
+06:59:33 Initializing from normalized Laplacian + noise (using RSpectra)
+06:59:34 Commencing optimization for 200 epochs, with 1257014 positive edges
+06:59:34 Using rng type: pcg
+06:59:45 Optimization finished</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb63"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb63-1"><a href="#cb63-1" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(object)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-26-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The above plot shows how individual cells are located in a 2D space (defined by the UMAP coordinates). Our dataset is finally ready for a deeper dive in the biology.</p>
+</section>
+<section id="clustering" class="level2">
+<h2 class="anchored" data-anchor-id="clustering">Clustering</h2>
+<p>We can now find “clusters” of cells that likely represent the same celltype. For single-cell data, a popular choice of methods for clustering is graph-based community detection methods that can scale to millions of cells (as opposed to tree-based methods such as hierechial clustering):</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb64"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="co"># build SNN graph</span></span>
+<span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a>object <span class="ot">&lt;-</span> <span class="fu">FindNeighbors</span>(object, <span class="at">reduction =</span> <span class="st">"pca"</span>, <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Computing nearest neighbor graph</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Computing SNN</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb67"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a>object <span class="ot">&lt;-</span> <span class="fu">FindClusters</span>(object, <span class="at">resolution =</span> <span class="fl">0.3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Modularity Optimizer version 1.3.0 by Ludo Waltman and Nees Jan van Eck
+
+Number of nodes: 27999
+Number of edges: 1008818
+
+Running Louvain algorithm...
+Maximum modularity in 10 random starts: 0.9347
+Number of communities: 17
+Elapsed time: 5 seconds</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb69"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(object, <span class="at">label =</span> <span class="cn">TRUE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-28-1.png" class="img-fluid figure-img" width="768"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="identifying-microglia-cluster" class="level1">
+<h1>Identifying Microglia cluster</h1>
+<p>We can visualize some of the marker genes that define the Microglia (See Figure 2 in the associated paper)</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb70"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a><span class="fu">FeaturePlot</span>(object, <span class="at">features =</span> <span class="fu">c</span>(<span class="st">"C1qa"</span>, <span class="st">"Fcrls"</span>, <span class="st">"Tyrobp"</span>, <span class="st">"Csf1r"</span>, <span class="st">"Cx3cr1"</span>, <span class="st">"P2ry12"</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-29-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>While we can clearly see which cells have highe expression of these genes on the UMAP, it is not clear which “cluster” these cells belong to. You can use <code>VlnPlot</code> to plot the expression pattern of these genes:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb71"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a><span class="fu">VlnPlot</span>(object, <span class="at">features =</span> <span class="fu">c</span>(<span class="st">"C1qa"</span>, <span class="st">"Fcrls"</span>, <span class="st">"Tyrobp"</span>, <span class="st">"Csf1r"</span>, <span class="st">"Cx3cr1"</span>, <span class="st">"P2ry12"</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-30-1.png" class="img-fluid figure-img" width="864"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>So Cluster 12 is our microglia cluster, we can separate it out to do a deeper analysis</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb72"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a><span class="co"># subset out cluster 12</span></span>
+<span id="cb72-2"><a href="#cb72-2" aria-hidden="true" tabindex="-1"></a>all.microglia <span class="ot">&lt;-</span> <span class="fu">subset</span>(object, <span class="at">idents =</span> <span class="st">"12"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="find-differentiating-markers-between-the-5xfad-ad-mouse-and-the-wt-mouse" class="level1">
+<h1>Find differentiating markers between the 5XFAD (AD) mouse and the WT mouse</h1>
+<p>Our next goal is to decipher what genes are differentially expressed in the 5XFAD mouse as compared to the WT mouse (we expect there to be some genes that will be highly expressed in WT and lowly expressed in 5X5AD and vice-versa).</p>
+<p>To find differentially expressed (DE) genes, we first set the “identity” of the cells to be the “mouse_model” metadata column and then identify diferentially expressed genes in the 5XFAD mouse as compared to the “WT” mouse using the <code>FindMarkers</code> command:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb73"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb73-1"><a href="#cb73-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Assign the identity to be the mouse model</span></span>
+<span id="cb73-2"><a href="#cb73-2" aria-hidden="true" tabindex="-1"></a><span class="co"># among the 'mouse_model` labeled 5XFAD we have both the original 5XFAD (labeled as 'WT' under `genotype` column) and a 'TREM2KO' reflecting the TREM2KO which we remove for this part of the analysis</span></span>
+<span id="cb73-3"><a href="#cb73-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb73-4"><a href="#cb73-4" aria-hidden="true" tabindex="-1"></a>microglia.notrem2ko <span class="ot">&lt;-</span> <span class="fu">subset</span>(all.microglia, genotype <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"WT"</span>))</span>
+<span id="cb73-5"><a href="#cb73-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb73-6"><a href="#cb73-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb73-7"><a href="#cb73-7" aria-hidden="true" tabindex="-1"></a><span class="fu">Idents</span>(microglia.notrem2ko) <span class="ot">&lt;-</span> <span class="st">"mouse_model"</span></span>
+<span id="cb73-8"><a href="#cb73-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb73-9"><a href="#cb73-9" aria-hidden="true" tabindex="-1"></a>markers.wt_vs_5ad <span class="ot">&lt;-</span> <span class="fu">FindMarkers</span>(microglia.notrem2ko, <span class="at">ident.1 =</span> <span class="st">"5XFAD"</span>, <span class="at">ident.2 =</span> <span class="st">"WT"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>For a (much!) faster implementation of the Wilcoxon Rank Sum Test,
+(default method for FindMarkers) please install the presto package
+--------------------------------------------
+install.packages('devtools')
+devtools::install_github('immunogenomics/presto')
+--------------------------------------------
+After installation of presto, Seurat will automatically use the more 
+efficient implementation (no further action necessary).
+This message will be shown once per session</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb75"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb75-1"><a href="#cb75-1" aria-hidden="true" tabindex="-1"></a>markers.wt_vs_5ad<span class="sc">$</span>gene <span class="ot">&lt;-</span> <span class="fu">rownames</span>(markers.wt_vs_5ad)</span>
+<span id="cb75-2"><a href="#cb75-2" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(markers.wt_vs_5ad)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>            p_val avg_log2FC pct.1 pct.2    p_val_adj gene
+Cst7 7.936308e-21   5.228819 0.455 0.011 1.345522e-16 Cst7
+Thy1 1.232779e-12   2.115677 0.750 0.422 2.090053e-08 Thy1
+Ctsd 6.370545e-12   1.409896 0.955 0.911 1.080062e-07 Ctsd
+Apoe 7.837905e-10   1.181252 0.932 0.794 1.328838e-05 Apoe
+Cd74 4.505810e-09   3.056268 0.261 0.028 7.639151e-05 Cd74
+Lyz2 4.938580e-09   1.785782 0.489 0.156 8.372869e-05 Lyz2</code></pre>
+</div>
+</div>
+<p>To visualize these genes we will make use of a “volcano plot” where on the x-axis we will plot the log fold change of each gene and the associated p-value will be plotted on the y-axis. Additinally we will also highlight top 10 DE genes in both directions (positive, i.e.&nbsp;upregulated in 5XFAD and negative, i.e.&nbsp;downregulated in 5XFAD).</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb77"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb77-1"><a href="#cb77-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggrepel) <span class="co"># load this library to plot gene names</span></span>
+<span id="cb77-2"><a href="#cb77-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb77-3"><a href="#cb77-3" aria-hidden="true" tabindex="-1"></a>markers.wt_vs_5ad.top10.pos <span class="ot">&lt;-</span> markers.wt_vs_5ad <span class="sc">%&gt;%</span></span>
+<span id="cb77-4"><a href="#cb77-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(avg_log2FC<span class="sc">&gt;</span><span class="dv">0</span>) <span class="sc">%&gt;%</span> <span class="fu">filter</span>(p_val_adj<span class="sc">&lt;</span><span class="fl">0.05</span>) <span class="sc">%&gt;%</span> <span class="fu">top_n</span>(<span class="at">n =</span> <span class="dv">10</span>, <span class="at">wt =</span> avg_log2FC)</span>
+<span id="cb77-5"><a href="#cb77-5" aria-hidden="true" tabindex="-1"></a>markers.wt_vs_5ad.top10.neg <span class="ot">&lt;-</span> markers.wt_vs_5ad  <span class="sc">%&gt;%</span></span>
+<span id="cb77-6"><a href="#cb77-6" aria-hidden="true" tabindex="-1"></a>   <span class="fu">filter</span>(avg_log2FC<span class="sc">&lt;</span><span class="dv">0</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb77-7"><a href="#cb77-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(p_val_adj<span class="sc">&lt;</span><span class="fl">0.05</span>) <span class="sc">%&gt;%</span> <span class="fu">top_n</span>(<span class="at">n =</span> <span class="dv">10</span>, <span class="at">wt =</span> <span class="fu">abs</span>(avg_log2FC))</span>
+<span id="cb77-8"><a href="#cb77-8" aria-hidden="true" tabindex="-1"></a>markers.wt_vs_5ad.top10 <span class="ot">&lt;-</span> <span class="fu">rbind</span>(markers.wt_vs_5ad.top10.pos, markers.wt_vs_5ad.top10.neg)</span>
+<span id="cb77-9"><a href="#cb77-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb77-10"><a href="#cb77-10" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(markers.wt_vs_5ad, <span class="fu">aes</span>(avg_log2FC , <span class="sc">-</span><span class="fu">log10</span>(p_val))) <span class="sc">+</span></span>
+<span id="cb77-11"><a href="#cb77-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb77-12"><a href="#cb77-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">data =</span> markers.wt_vs_5ad.top10, <span class="fu">aes</span>(avg_log2FC , <span class="sc">-</span><span class="fu">log10</span>(p_val)), <span class="at">color=</span><span class="st">"red"</span> ) <span class="sc">+</span></span>
+<span id="cb77-13"><a href="#cb77-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text_repel</span>(<span class="at">data =</span> markers.wt_vs_5ad.top10, <span class="fu">aes</span>(avg_log2FC, <span class="sc">-</span><span class="fu">log10</span>(p_val), <span class="at">label =</span> gene)) <span class="sc">+</span> <span class="fu">xlab</span>(<span class="st">"average log2 Fold Change"</span>) <span class="sc">+</span> <span class="fu">ylab</span>(<span class="st">"-log10(Pvalue)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-33-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="functional-enrichment" class="level1">
+<h1>Functional enrichment</h1>
+<p>On obvious question to ask with the list of DE genes is what function are these carrying? We can perform a gene ontology enrichment using the gene lists to see what functional categories is each of the DE list enriched in.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb78"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb78-1"><a href="#cb78-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(clusterProfiler)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>clusterProfiler v4.20.0 Learn more at https://yulab-smu.top/contribution-knowledge-mining/
+
+Please cite:
+
+G Yu. Thirteen years of clusterProfiler. The Innovation. 2024,
+5(6):100722</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>
+Attaching package: 'clusterProfiler'</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following object is masked from 'package:purrr':
+
+    simplify</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following object is masked from 'package:stats':
+
+    filter</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb83"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb83-1"><a href="#cb83-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(org.Mm.eg.db) <span class="co"># install using BiocManager::install("org.Mm.eg.db")</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Loading required package: AnnotationDbi</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Loading required package: stats4</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Loading required package: BiocGenerics</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Loading required package: generics</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>
+Attaching package: 'generics'</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following object is masked from 'package:lubridate':
+
+    as.difftime</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following object is masked from 'package:dplyr':
+
+    explain</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following objects are masked from 'package:base':
+
+    as.difftime, as.factor, as.ordered, intersect, is.element, setdiff,
+    setequal, union</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>
+Attaching package: 'BiocGenerics'</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following object is masked from 'package:dplyr':
+
+    combine</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following objects are masked from 'package:stats':
+
+    IQR, mad, sd, var, xtabs</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following objects are masked from 'package:base':
+
+    anyDuplicated, aperm, append, as.data.frame, basename, cbind,
+    colnames, dirname, do.call, duplicated, eval, evalq, Filter, Find,
+    get, grep, grepl, is.unsorted, lapply, Map, mapply, match, mget,
+    order, paste, pmax, pmax.int, pmin, pmin.int, Position, rank,
+    rbind, Reduce, rownames, sapply, saveRDS, table, tapply, unique,
+    unsplit, which.max, which.min</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Loading required package: Biobase</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Welcome to Bioconductor
+
+    Vignettes contain introductory material; view with
+    'browseVignettes()'. To cite Bioconductor, see
+    'citation("Biobase")', and for packages 'citation("pkgname")'.</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Loading required package: IRanges</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Loading required package: S4Vectors</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>
+Attaching package: 'S4Vectors'</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following object is masked from 'package:clusterProfiler':
+
+    rename</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following objects are masked from 'package:lubridate':
+
+    second, second&lt;-</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following objects are masked from 'package:dplyr':
+
+    first, rename</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following object is masked from 'package:tidyr':
+
+    expand</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following object is masked from 'package:utils':
+
+    findMatches</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following objects are masked from 'package:base':
+
+    expand.grid, I, unname</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>
+Attaching package: 'IRanges'</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following object is masked from 'package:clusterProfiler':
+
+    slice</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following object is masked from 'package:lubridate':
+
+    %within%</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following objects are masked from 'package:dplyr':
+
+    collapse, desc, slice</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following object is masked from 'package:purrr':
+
+    reduce</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following object is masked from 'package:sp':
+
+    %over%</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>
+Attaching package: 'AnnotationDbi'</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following object is masked from 'package:clusterProfiler':
+
+    select</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following object is masked from 'package:dplyr':
+
+    select</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb116"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb116-1"><a href="#cb116-1" aria-hidden="true" tabindex="-1"></a>universe.genes <span class="ot">&lt;-</span> <span class="fu">rownames</span>(counts)</span>
+<span id="cb116-2"><a href="#cb116-2" aria-hidden="true" tabindex="-1"></a>DoEnrichment <span class="ot">&lt;-</span> <span class="cf">function</span>(genes, universe.genes) {</span>
+<span id="cb116-3"><a href="#cb116-3" aria-hidden="true" tabindex="-1"></a>  enrich <span class="ot">&lt;-</span> <span class="fu">enrichGO</span>(<span class="at">gene =</span> genes,</span>
+<span id="cb116-4"><a href="#cb116-4" aria-hidden="true" tabindex="-1"></a>                     <span class="at">universe =</span> universe.genes,</span>
+<span id="cb116-5"><a href="#cb116-5" aria-hidden="true" tabindex="-1"></a>                     <span class="at">OrgDb =</span> org.Mm.eg.db,</span>
+<span id="cb116-6"><a href="#cb116-6" aria-hidden="true" tabindex="-1"></a>                     <span class="at">keyType =</span> <span class="st">"SYMBOL"</span>,</span>
+<span id="cb116-7"><a href="#cb116-7" aria-hidden="true" tabindex="-1"></a>                     <span class="at">ont =</span> <span class="st">"BP"</span>,</span>
+<span id="cb116-8"><a href="#cb116-8" aria-hidden="true" tabindex="-1"></a>                     <span class="at">pvalueCutoff =</span> <span class="fl">0.05</span>,</span>
+<span id="cb116-9"><a href="#cb116-9" aria-hidden="true" tabindex="-1"></a>                     <span class="at">qvalueCutoff =</span> <span class="fl">0.05</span>,</span>
+<span id="cb116-10"><a href="#cb116-10" aria-hidden="true" tabindex="-1"></a>                     <span class="at">readable =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb116-11"><a href="#cb116-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(enrich)</span>
+<span id="cb116-12"><a href="#cb116-12" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb116-13"><a href="#cb116-13" aria-hidden="true" tabindex="-1"></a>de.pos <span class="ot">&lt;-</span> markers.wt_vs_5ad <span class="sc">%&gt;%</span></span>
+<span id="cb116-14"><a href="#cb116-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(avg_log2FC<span class="sc">&gt;</span><span class="dv">0</span>) <span class="sc">%&gt;%</span> <span class="fu">filter</span>(p_val_adj<span class="sc">&lt;</span><span class="fl">0.1</span>) <span class="sc">%&gt;%</span> <span class="fu">pull</span> (gene)</span>
+<span id="cb116-15"><a href="#cb116-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb116-16"><a href="#cb116-16" aria-hidden="true" tabindex="-1"></a>de.neg <span class="ot">&lt;-</span> markers.wt_vs_5ad <span class="sc">%&gt;%</span></span>
+<span id="cb116-17"><a href="#cb116-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(avg_log2FC<span class="sc">&lt;</span><span class="dv">0</span>) <span class="sc">%&gt;%</span> <span class="fu">filter</span>(p_val_adj<span class="sc">&lt;</span><span class="fl">0.1</span>) <span class="sc">%&gt;%</span> <span class="fu">pull</span> (gene)</span>
+<span id="cb116-18"><a href="#cb116-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb116-19"><a href="#cb116-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb116-20"><a href="#cb116-20" aria-hidden="true" tabindex="-1"></a>enrichment.pos <span class="ot">&lt;-</span> <span class="fu">DoEnrichment</span>(<span class="at">genes =</span> de.pos, <span class="at">universe.genes =</span> universe.genes)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>'select()' returned 1:1 mapping between keys and columns</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>'select()' returned 1:1 mapping between keys and columns</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning in bitr(gene, fromType = fromType, toType = "ENTREZID", OrgDb = OrgDb):
+10.11% of input gene IDs are fail to map...</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb120"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb120-1"><a href="#cb120-1" aria-hidden="true" tabindex="-1"></a>enrichment.neg <span class="ot">&lt;-</span> <span class="fu">DoEnrichment</span>(<span class="at">genes =</span> de.neg, <span class="at">universe.genes =</span> universe.genes)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>'select()' returned 1:1 mapping between keys and columns
+'select()' returned 1:1 mapping between keys and columns</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning in bitr(gene, fromType = fromType, toType = "ENTREZID", OrgDb = OrgDb):
+10.11% of input gene IDs are fail to map...</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb123"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb123-1"><a href="#cb123-1" aria-hidden="true" tabindex="-1"></a><span class="fu">barplot</span>(enrichment.pos)<span class="sc">+</span> <span class="fu">ggtitle</span>(<span class="st">"Enrichment of 5XFAD upregulated genes"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-35-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb124"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb124-1"><a href="#cb124-1" aria-hidden="true" tabindex="-1"></a><span class="fu">barplot</span>(enrichment.neg, <span class="at">showTerms =</span> <span class="dv">7</span>) <span class="sc">+</span> <span class="fu">ggtitle</span>(<span class="st">"Enrichment of 5XFAD downregulated genes"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-36-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We should compare your results with the following claim in the paper:</p>
+<blockquote class="blockquote">
+<p>DAM genes, including Cst7, Csf1, Apoe, Trem2, Lpl, Lilrb4a, H2-d1 (an MHC-I gene), Cd74 (an MHC-II-related gene) and various cathepsin genes were notably upregulated in 5XFAD compared with WT mice. Homeostatic genes, such as P2ry12, Selplg, Tmem119 and Cx3cr1, were downregulated. These results were highly concordant between the 7-month- and 15-month-old datasets (Fig. 2d) and with previously published single-cell RNAseq data of sorted microglia.</p>
+</blockquote>
+<p>List of genes upregulated in 5XFAD:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb125"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb125-1"><a href="#cb125-1" aria-hidden="true" tabindex="-1"></a>de.pos</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> [1] "Cst7"  "Thy1"  "Ctsd"  "Apoe"  "Cd74"  "Lyz2"  "B2m"   "H2-K1" "Ctsb" 
+[10] "Spp1"  "H2-D1" "Cpne7" "Ctsz" </code></pre>
+</div>
+</div>
+<p>List of genes downregulated in 5XFAD:</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb127"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb127-1"><a href="#cb127-1" aria-hidden="true" tabindex="-1"></a>de.neg</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "Cst3"   "Selplg"</code></pre>
+</div>
+</div>
+</section>
+<section id="exercise" class="level1">
+<h1>Exercise</h1>
+<p>Identify what genes are differentially expressed in 5XFAD mouse as compared to the WT mouse.</p>
+<details>
+<summary>
+Reveal solution
+</summary>
+<p>The <code>mouse_model</code> column stores the information about it being a WT or an AD (5XFAD) mouse. In this study the authors were also interested in asking what changes happen to the microglial gene program if TREM2 is knocked out (given the prior knowledge about microglial transcriptional response dependence on TREM2). In the above analysis we removed cells that were not labeled as “WT” under their “genotype” column. Here we will subset a different set of cells which are all “5XFAD” but can have different <code>genotype</code> (“WT” or “TREM2KO”)</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb129"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb129-1"><a href="#cb129-1" aria-hidden="true" tabindex="-1"></a>microglia<span class="fl">.5</span>xfad <span class="ot">&lt;-</span> <span class="fu">subset</span>(all.microglia, mouse_model <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"5XFAD"</span>))</span>
+<span id="cb129-2"><a href="#cb129-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb129-3"><a href="#cb129-3" aria-hidden="true" tabindex="-1"></a><span class="co"># now we set the identities to the genotype</span></span>
+<span id="cb129-4"><a href="#cb129-4" aria-hidden="true" tabindex="-1"></a><span class="fu">Idents</span>(microglia<span class="fl">.5</span>xfad) <span class="ot">&lt;-</span> <span class="st">"genotype"</span></span>
+<span id="cb129-5"><a href="#cb129-5" aria-hidden="true" tabindex="-1"></a>markers<span class="fl">.5</span>ad_vs_trem2ko <span class="ot">&lt;-</span> <span class="fu">FindMarkers</span>(microglia<span class="fl">.5</span>xfad, <span class="at">ident.1 =</span> <span class="st">"WT"</span>, <span class="at">ident.2 =</span> <span class="st">"Trem2KO"</span>)</span>
+<span id="cb129-6"><a href="#cb129-6" aria-hidden="true" tabindex="-1"></a>markers<span class="fl">.5</span>ad_vs_trem2ko<span class="sc">$</span>gene <span class="ot">&lt;-</span> <span class="fu">rownames</span>(markers<span class="fl">.5</span>ad_vs_trem2ko)</span>
+<span id="cb129-7"><a href="#cb129-7" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(markers<span class="fl">.5</span>ad_vs_trem2ko)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>               p_val avg_log2FC pct.1 pct.2    p_val_adj    gene
+Trem2   9.850060e-10   4.358352 0.920 0.105 1.669979e-05   Trem2
+Cfap20  1.355274e-04  -3.211504 0.023 0.263 1.000000e+00  Cfap20
+Ubqln2  1.775545e-04  -4.211504 0.000 0.158 1.000000e+00  Ubqln2
+Col16a1 1.775545e-04  -4.211504 0.000 0.158 1.000000e+00 Col16a1
+Cep135  1.775545e-04  -4.211504 0.000 0.158 1.000000e+00  Cep135
+Ddx25   1.775545e-04  -4.211504 0.000 0.158 1.000000e+00   Ddx25</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb131"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb131-1"><a href="#cb131-1" aria-hidden="true" tabindex="-1"></a>markers<span class="fl">.5</span>ad_vs_trem2ko.top10.pos <span class="ot">&lt;-</span> markers<span class="fl">.5</span>ad_vs_trem2ko <span class="sc">%&gt;%</span></span>
+<span id="cb131-2"><a href="#cb131-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(avg_log2FC<span class="sc">&gt;</span><span class="dv">0</span>) <span class="sc">%&gt;%</span> <span class="fu">filter</span>(p_val_adj<span class="sc">&lt;</span><span class="fl">0.05</span>) <span class="sc">%&gt;%</span> <span class="fu">top_n</span>(<span class="at">n =</span> <span class="dv">10</span>, <span class="at">wt =</span> avg_log2FC)</span>
+<span id="cb131-3"><a href="#cb131-3" aria-hidden="true" tabindex="-1"></a>markers<span class="fl">.5</span>ad_vs_trem2ko.top10.neg <span class="ot">&lt;-</span> markers<span class="fl">.5</span>ad_vs_trem2ko  <span class="sc">%&gt;%</span></span>
+<span id="cb131-4"><a href="#cb131-4" aria-hidden="true" tabindex="-1"></a>   <span class="fu">filter</span>(avg_log2FC<span class="sc">&lt;</span><span class="dv">0</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb131-5"><a href="#cb131-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(p_val_adj<span class="sc">&lt;</span><span class="fl">0.05</span>) <span class="sc">%&gt;%</span> <span class="fu">top_n</span>(<span class="at">n =</span> <span class="dv">10</span>, <span class="at">wt =</span> <span class="fu">abs</span>(avg_log2FC))</span>
+<span id="cb131-6"><a href="#cb131-6" aria-hidden="true" tabindex="-1"></a>markers<span class="fl">.5</span>ad_vs_trem2ko.top10 <span class="ot">&lt;-</span> <span class="fu">rbind</span>(markers<span class="fl">.5</span>ad_vs_trem2ko.top10.pos, markers<span class="fl">.5</span>ad_vs_trem2ko.top10.neg)</span>
+<span id="cb131-7"><a href="#cb131-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb131-8"><a href="#cb131-8" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(markers<span class="fl">.5</span>ad_vs_trem2ko, <span class="fu">aes</span>(avg_log2FC , <span class="sc">-</span><span class="fu">log10</span>(p_val))) <span class="sc">+</span></span>
+<span id="cb131-9"><a href="#cb131-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb131-10"><a href="#cb131-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">data =</span> markers<span class="fl">.5</span>ad_vs_trem2ko.top10, <span class="fu">aes</span>(avg_log2FC , <span class="sc">-</span><span class="fu">log10</span>(p_val)), <span class="at">color=</span><span class="st">"red"</span> ) <span class="sc">+</span></span>
+<span id="cb131-11"><a href="#cb131-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text_repel</span>(<span class="at">data =</span> markers<span class="fl">.5</span>ad_vs_trem2ko.top10, <span class="fu">aes</span>(avg_log2FC, <span class="sc">-</span><span class="fu">log10</span>(p_val), <span class="at">label =</span> gene)) <span class="sc">+</span> <span class="fu">xlab</span>(<span class="st">"average log2 Fold Change"</span>) <span class="sc">+</span> <span class="fu">ylab</span>(<span class="st">"-log10(Pvalue)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_scrna_files/figure-html/unnamed-chunk-40-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</details>
+<details>
+<summary>
+<strong>Session Info</strong>
+</summary>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb132"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb132-1"><a href="#cb132-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sessionInfo</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>R version 4.6.1 (2026-06-24)
+Platform: aarch64-apple-darwin23
+Running under: macOS Tahoe 26.5.2
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.6/Resources/lib/libRblas.0.dylib 
+LAPACK: /Library/Frameworks/R.framework/Versions/4.6/Resources/lib/libRlapack.dylib;  LAPACK version 3.12.1
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+
+time zone: Asia/Kolkata
+tzcode source: internal
+
+attached base packages:
+[1] stats4    stats     graphics  grDevices utils     datasets  methods  
+[8] base     
+
+other attached packages:
+ [1] org.Mm.eg.db_3.23.0    AnnotationDbi_1.74.0   IRanges_2.46.0        
+ [4] S4Vectors_0.50.1       Biobase_2.72.0         BiocGenerics_0.58.1   
+ [7] generics_0.1.4         clusterProfiler_4.20.0 ggrepel_0.9.8         
+[10] future_1.70.0          lubridate_1.9.5        forcats_1.0.1         
+[13] stringr_1.6.0          dplyr_1.2.1            purrr_1.2.2           
+[16] readr_2.2.0            tidyr_1.3.2            tibble_3.3.1          
+[19] ggplot2_4.0.3          tidyverse_2.0.0        Seurat_5.5.1          
+[22] SeuratObject_5.4.0     sp_2.2-1              
+
+loaded via a namespace (and not attached):
+  [1] RcppAnnoy_0.0.23            splines_4.6.1              
+  [3] later_1.4.8                 ggplotify_0.1.3            
+  [5] polyclip_1.10-7             enrichit_0.2.0             
+  [7] fastDummies_1.7.6           lifecycle_1.0.5            
+  [9] httr2_1.2.3                 globals_0.19.1             
+ [11] processx_3.9.0              lattice_0.22-9             
+ [13] MASS_7.3-65                 magrittr_2.0.5             
+ [15] limma_3.68.4                plotly_4.12.0              
+ [17] rmarkdown_2.31              yaml_2.3.12                
+ [19] ggtangle_0.1.2              httpuv_1.6.17              
+ [21] otel_0.2.0                  glmGamPoi_1.24.0           
+ [23] sctransform_0.4.3           spam_2.11-4                
+ [25] spatstat.sparse_3.2-0       reticulate_1.46.0          
+ [27] cowplot_1.2.0               pbapply_1.7-4              
+ [29] DBI_1.3.0                   RColorBrewer_1.1-3         
+ [31] abind_1.4-8                 Rtsne_0.17                 
+ [33] GenomicRanges_1.64.0        yulab.utils_0.2.4          
+ [35] tweenr_2.0.3                rappdirs_0.3.4             
+ [37] aisdk_1.4.12                gdtools_0.5.1              
+ [39] enrichplot_1.32.0           irlba_2.3.7                
+ [41] listenv_1.0.0               spatstat.utils_3.2-3       
+ [43] tidytree_0.4.8              goftest_1.2-3              
+ [45] RSpectra_0.16-2             spatstat.random_3.5-0      
+ [47] fitdistrplus_1.2-6          parallelly_1.48.0          
+ [49] DelayedMatrixStats_1.34.0   codetools_0.2-20           
+ [51] DelayedArray_0.38.2         ggforce_0.5.0              
+ [53] DOSE_4.6.0                  tidyselect_1.2.1           
+ [55] aplot_0.3.1                 farver_2.1.2               
+ [57] matrixStats_1.5.0           spatstat.explore_3.8-1     
+ [59] Seqinfo_1.2.0               jsonlite_2.0.0             
+ [61] progressr_1.0.0             ggridges_0.5.7             
+ [63] survival_3.8-6              systemfonts_1.3.2          
+ [65] ggnewscale_0.5.2            tools_4.6.1                
+ [67] treeio_1.36.1               ica_1.0-3                  
+ [69] Rcpp_1.1.1-1.1              glue_1.8.1                 
+ [71] gridExtra_2.3.1             SparseArray_1.12.2         
+ [73] xfun_0.59                   qvalue_2.44.0              
+ [75] MatrixGenerics_1.24.0       withr_3.0.3                
+ [77] fastmap_1.2.0               callr_3.8.0                
+ [79] digest_0.6.39               timechange_0.4.0           
+ [81] gridGraphics_0.5-1          R6_2.6.1                   
+ [83] mime_0.13                   scattermore_1.2            
+ [85] GO.db_3.23.1                tensor_1.5.1               
+ [87] spatstat.data_3.1-9         RSQLite_3.53.3             
+ [89] fontLiberation_0.1.0        data.table_1.18.4          
+ [91] httr_1.4.8                  htmlwidgets_1.6.4          
+ [93] S4Arrays_1.12.0             scatterpie_0.2.6           
+ [95] uwot_0.2.4                  pkgconfig_2.0.3            
+ [97] gtable_0.3.6                blob_1.3.0                 
+ [99] lmtest_0.9-40               S7_0.2.2                   
+[101] XVector_0.52.0              htmltools_0.5.9            
+[103] fontBitstreamVera_0.1.1     dotCall64_1.2              
+[105] scales_1.4.0                png_0.1-9                  
+[107] spatstat.univar_3.2-0       ggfun_0.2.1                
+[109] knitr_1.51                  rstudioapi_0.19.0          
+[111] tzdb_0.5.0                  reshape2_1.4.5             
+[113] nlme_3.1-169                org.Hs.eg.db_3.23.1        
+[115] zoo_1.8-15                  cachem_1.1.0               
+[117] KernSmooth_2.23-26          parallel_4.6.1             
+[119] miniUI_0.1.2                pillar_1.11.1              
+[121] grid_4.6.1                  vctrs_0.7.3                
+[123] RANN_2.6.2                  promises_1.5.0             
+[125] tidydr_0.0.6                beachmat_2.28.0            
+[127] xtable_1.8-8                cluster_2.1.8.2            
+[129] evaluate_1.0.5              cli_3.6.6                  
+[131] compiler_4.6.1              rlang_1.2.0                
+[133] crayon_1.5.3                future.apply_1.20.2        
+[135] labeling_0.4.3              plyr_1.8.9                 
+[137] fs_2.1.0                    ggiraph_0.9.6              
+[139] stringi_1.8.7               viridisLite_0.4.3          
+[141] deldir_2.0-4                Biostrings_2.80.1          
+[143] lazyeval_0.2.3              spatstat.geom_3.8-1        
+[145] fontquiver_0.2.1            GOSemSim_2.38.3            
+[147] Matrix_1.7-5                RcppHNSW_0.7.0             
+[149] hms_1.1.4                   patchwork_1.3.2            
+[151] sparseMatrixStats_1.24.0    bit64_4.8.2                
+[153] statmod_1.5.2               KEGGREST_1.52.2            
+[155] shiny_1.14.0                SummarizedExperiment_1.42.0
+[157] ROCR_1.0-12                 igraph_2.3.3               
+[159] memoise_2.0.1               ggtree_4.2.0               
+[161] bit_4.6.0                   gson_0.2.0                 
+[163] ape_5.8-1                  </code></pre>
+</div>
+</div>
+</details>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

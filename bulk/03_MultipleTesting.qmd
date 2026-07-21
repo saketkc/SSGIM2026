@@ -1,5 +1,10 @@
 ---
 title: "Multiple hypothesis testing: A primer"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    embed-resources: true
 ---
 
 ## The problem of multiple testing
